@@ -1,35 +1,138 @@
 Type: `vsphere-iso`
 Artifact BuilderId: `jetbrains.vsphere`
 
-This builder uses the vSphere API, and creates virtual machines remotely. It
-starts from an ISO file and creates new VMs from scratch.
+This builder starts from a guest operating system ISO file and builds a virtual machine image on a
+vSphere cluster or an ESXi host using the vSphere API.
 
-- VMware Player is not required.
-- It uses the official vCenter Server API, and does not require ESXi host [modification](/packer/integrations/hashicorp/vsphere/latest/components/builder/vsphere-iso#building-on-a-remote-vsphere-hypervisor)
-- The builder supports versions following the VMware Product Lifecycle Matrix
-  from General Availability to End of General Support. Builds on versions that
-  are end of support may work, but configuration options may throw errors if
-  they do not exist in the vSphere API for those versions.
+-> **Note:** This builder is developed to maintain compatibility with VMware vSphere versions
+until their respective End of General Support dates. For detailed information, refer to the [VMware Product Lifecycle Matrix](https://lifecycle.vmware.com).
 
 ## Examples
 
-See example templates in the [examples folder](https://github.com/hashicorp/packer-plugin-vsphere/tree/main/builder/vsphere/examples/).
+1. See example templates in the [examples folder](https://github.com/hashicorp/packer-plugin-vsphere/tree/main/builder/vsphere/examples/).
+2.
 
-# Configuration Reference
+## Configuration Reference
 
-There are many configuration options available for this builder. In addition to
-the items listed here, you will want to look at the general configuration
-references for [HTTP](#http-directory-configuration),
-[Floppy](#floppy-configuration),
-[Boot](#boot-configuration),
-[Hardware](#hardware-configuration),
-[Output](#output-configuration),
-[Run](#run-configuration),
-[Shutdown](#shutdown-configuration),
-[Communicator](#communicator-configuration),
-[Export](#export-configuration),
-configuration references, which are
-necessary for this build to succeed and can be found further down the page.
+### HTTP Configuration
+
+<!-- Code generated from the comments of the HTTPConfig struct in multistep/commonsteps/http_config.go; DO NOT EDIT MANUALLY -->
+
+Packer will create an http server serving `http_directory` when it is set, a
+random free port will be selected and the architecture of the directory
+referenced will be available in your builder.
+
+Example usage from a builder:
+
+```
+wget http://{{ .HTTPIP }}:{{ .HTTPPort }}/foo/bar/preseed.cfg
+```
+
+<!-- End of code generated from the comments of the HTTPConfig struct in multistep/commonsteps/http_config.go; -->
+
+
+#### Optional
+
+<!-- Code generated from the comments of the HTTPConfig struct in multistep/commonsteps/http_config.go; DO NOT EDIT MANUALLY -->
+
+- `http_directory` (string) - Path to a directory to serve using an HTTP server. The files in this
+  directory will be available over HTTP that will be requestable from the
+  virtual machine. This is useful for hosting kickstart files and so on.
+  By default this is an empty string, which means no HTTP server will be
+  started. The address and port of the HTTP server will be available as
+  variables in `boot_command`. This is covered in more detail below.
+
+- `http_content` (map[string]string) - Key/Values to serve using an HTTP server. `http_content` works like and
+  conflicts with `http_directory`. The keys represent the paths and the
+  values contents, the keys must start with a slash, ex: `/path/to/file`.
+  `http_content` is useful for hosting kickstart files and so on. By
+  default this is empty, which means no HTTP server will be started. The
+  address and port of the HTTP server will be available as variables in
+  `boot_command`. This is covered in more detail below.
+  Example:
+  ```hcl
+    http_content = {
+      "/a/b"     = file("http/b")
+      "/foo/bar" = templatefile("${path.root}/preseed.cfg", { packages = ["nginx"] })
+    }
+  ```
+
+- `http_port_min` (int) - These are the minimum and maximum port to use for the HTTP server
+  started to serve the `http_directory`. Because Packer often runs in
+  parallel, Packer will choose a randomly available port in this range to
+  run the HTTP server. If you want to force the HTTP server to be on one
+  port, make this minimum and maximum port the same. By default the values
+  are `8000` and `9000`, respectively.
+
+- `http_port_max` (int) - HTTP Port Max
+
+- `http_bind_address` (string) - This is the bind address for the HTTP server. Defaults to 0.0.0.0 so that
+  it will work with any network interface.
+
+<!-- End of code generated from the comments of the HTTPConfig struct in multistep/commonsteps/http_config.go; -->
+
+
+### Connection Configuration
+
+#### Optional:
+
+<!-- Code generated from the comments of the ConnectConfig struct in builder/vsphere/common/step_connect.go; DO NOT EDIT MANUALLY -->
+
+- `vcenter_server` (string) - Specifies the fully qualified domain name or IP address of the vCenter Server instance.
+
+- `username` (string) - Specifies the username to authenticate with the vCenter Server instance.
+
+- `password` (string) - Specifies the password to authenticate with the vCenter Server instance.
+
+- `insecure_connection` (bool) - Specifies not to validate the certificate of the vCenter Server instance.
+  Defaults to `false`.
+  
+  -> **Note:** This option is beneficial in scenarios where the certificate is self-signed
+  or does not meet standard validation criteria.
+
+- `datacenter` (string) - Specifies the name of the datacenter object in the vSphere inventory.
+  
+  -> **Note:** Required if more than one datacenter object exists in the vSphere inventory.
+
+<!-- End of code generated from the comments of the ConnectConfig struct in builder/vsphere/common/step_connect.go; -->
+
+
+### Location Configuration
+
+#### Optional:
+
+<!-- Code generated from the comments of the LocationConfig struct in builder/vsphere/common/config_location.go; DO NOT EDIT MANUALLY -->
+
+- `vm_name` (string) - Name of the virtual machine.
+
+- `folder` (string) - VM folder where the virtual machine is created.
+
+- `cluster` (string) - vSphere cluster where the virtual machine is created. See the
+  [Working With Clusters And Hosts](#working-with-clusters-and-hosts)
+  section above for more details.
+
+- `host` (string) - ESXi host where the virtual machine is created. A full path must be
+  specified if the host is in a folder. For example `folder/host`. See the
+  [Working With Clusters And Hosts](#working-with-clusters-and-hosts)
+  section above for more details.
+
+- `resource_pool` (string) - vSphere resource pool where the virtual machine is created.
+  If this is not specified, the root resource pool associated with the
+  `host` or `cluster` is used.
+  Note that the full path to the resource pool must be provided.
+  For example, a simple resource pool path might resemble `rp-packer` and
+  a nested path might resemble 'rp-packer/rp-linux-images'.
+
+- `datastore` (string) - vSphere datastore where the virtual machine is created.
+  Required if `host` is a cluster, or if `host` has multiple datastores.
+
+- `set_host_for_datastore_uploads` (bool) - Specifies that the host is used for uploading files to the datastore.
+  Defaults to false.
+
+<!-- End of code generated from the comments of the LocationConfig struct in builder/vsphere/common/config_location.go; -->
+
+
+#### Optional
 
 <!-- Code generated from the comments of the Config struct in builder/vsphere/iso/config.go; DO NOT EDIT MANUALLY -->
 
@@ -41,19 +144,675 @@ necessary for this build to succeed and can be found further down the page.
 
 - `convert_to_template` (bool) - Specifies to convert the cloned virtual machine to a template after the build is complete.
   Defaults to `false`.
-  If set to `true`, the virtual machine can not be imported to a content library.
-
-- `export` (\*common.ExportConfig) - Specifies the configuration for exporting the virtual machine to an OVF.
-  The virtual machine is not exported if [export configuration](#export-configuration) is not specified.
+  
+  -> **Note:** If set to `true`, the virtual machine can not be imported to a content library.
 
 - `content_library_destination` (\*common.ContentLibraryDestinationConfig) - Specifies the configuration for importing a VM template or OVF template to a content library.
-  The template will not be imported if no [content library import configuration](#content-library-import-configuration) is specified.
-  If set, `convert_to_template` must be set to `false`.
+  The template will not be imported if no [content library import configuration](#content-library-import-configuration)
+  is specified.
+  
+  -> **Note:** If set, `convert_to_template` must be set to `false`.
+
+- `export` (\*common.ExportConfig) - Specifies the configuration for exporting the virtual machine to an OVF.
+  
+  -> **Note:** The virtual machine is not exported if the [export configuration](#export-configuration)
+  is not specified.
 
 <!-- End of code generated from the comments of the Config struct in builder/vsphere/iso/config.go; -->
 
 
-## Boot Configuration
+### Hardware Configuration
+
+#### Optional:
+
+<!-- Code generated from the comments of the HardwareConfig struct in builder/vsphere/common/step_hardware.go; DO NOT EDIT MANUALLY -->
+
+- `CPUs` (int32) - Specifies the number of virtual CPUs cores for the virtual machine.
+
+- `cpu_cores` (int32) - Specifies the number of virtual CPU cores per socket for the virtual machine.
+
+- `CPU_reservation` (int64) - Specifies the CPU reservation in MHz.
+
+- `CPU_limit` (int64) - Specifies the upper limit of available CPU resources in MHz.
+
+- `CPU_hot_plug` (bool) - Specifies to enable CPU hot plug setting for virtual machine. Defaults to `false`
+
+- `RAM` (int64) - Specifies the amount of memory for the virtual machine in MB.
+
+- `RAM_reservation` (int64) - Specifies the amount of reserved memory in MB.
+
+- `RAM_reserve_all` (bool) - Specifies to reserve all allocated memory. Defaults to `false`.
+  
+  -> **Note:** May not be used together with `RAM_reservation`.
+
+- `RAM_hot_plug` (bool) - Specified to enable memory hot add setting for virtual machine. Defaults to `false`.
+
+- `video_ram` (int64) - Specifies the amount of video memory in KB. Defaults to 4096 KB.
+  
+  -> **Note:** Refer to the [vSphere documentation](https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-789C3913-1053-4850-A0F0-E29C3D32B6DA.html)
+  for supported maximums.
+
+- `displays` (int32) - Specifies the number of video displays. Defaults to `1`.
+  
+  `-> **Note:** Refer to the [vSphere documentation](https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-789C3913-1053-4850-A0F0-E29C3D32B6DA.html)
+  for supported maximums.
+
+- `vgpu_profile` (string) - Specifies the vGPU profile for accelerated graphics. Defaults to `none`.
+  
+  -> **Note:** Refer to the [NVIDIA GRID vGPU documentation](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#configure-vmware-vsphere-vm-with-vgpu)
+  for examples of profile names.
+
+- `NestedHV` (bool) - Specified to enable nested hardware virtualization for the virtual machine. Defaults to
+  `false`.
+
+- `firmware` (string) - Specifies the firmware for the virtual machine.
+  
+  The available options for this setting are: 'bios', 'efi', and 'efi-secure'.
+  
+  -> **Note:** Use `efi-secure` for UEFI Secure Boot.
+
+- `force_bios_setup` (bool) - Specifies to force entry into the BIOS setup screen during boot. Defaults to `false`.
+
+- `vTPM` (bool) - Specifies to enable virtual trusted platform module (TPM) device for the virtual machine.
+  Defaults to `false`.
+
+- `precision_clock` (string) - Specifies the virtual precision clock device for the virtual machine. Defaults to `none`.
+  
+  The available options for this setting are: `none`, `ntp`, and `ptp`.
+
+<!-- End of code generated from the comments of the HardwareConfig struct in builder/vsphere/common/step_hardware.go; -->
+
+
+### Create Configuration
+
+<!-- Code generated from the comments of the CreateConfig struct in builder/vsphere/iso/step_create.go; DO NOT EDIT MANUALLY -->
+
+- `vm_version` (uint) - Specifies the virtual machine hardware version. Defaults to the most current virtual machine
+  hardware version supported by the ESXi host.
+  
+  -> **Note:** Refer to [VMware KB article 1003746](https://kb.vmware.com/s/article/1003746)
+  for the a of supported virtual machine hardware versions.
+
+- `guest_os_type` (string) - Specifies the guest operating system identifier for the virtual machine. Defaults to
+  `otherGuest`.
+  
+  To get a list of supported guest operating system identifiers for your ESXi host,
+  run the following PowerShell command using `VMware.PowerCLI`:
+  
+  ```powershell
+  Connect-VIServer -Server "vcenter.example.com" -User "administrator@vsphere" -Password "password"
+  $esxiHost = Get-VMHost -Name "esxi-01.example.com"
+  $environmentBrowser = Get-View -Id $esxiHost.ExtensionData.Parent.ExtensionData.ConfigManager.EnvironmentBrowser
+  $vmxVersion = ($environmentBrowser.QueryConfigOptionDescriptor() | Where-Object DefaultConfigOption).Key
+  $osDescriptor = $environmentBrowser.QueryConfigOption($vmxVersion, $null).GuestOSDescriptor
+  $osDescriptor | Select-Object Id, Fullname
+  ```
+
+- `network_adapters` ([]NIC) - Specifies the network adapters for the virtual machine.
+  
+  -> **Note:** If no network adapter is defined, all network-related operations are skipped.
+
+- `usb_controller` ([]string) - Specifies the USB controllers for the virtual machine.
+  
+  The available options for this setting are: `usb` and `xhci`.
+  
+  - `usb`: USB 2.0
+  - `xhci`: USB 3.0
+  
+  -> **Note:** A maximum of one of each controller type can be defined.
+
+- `notes` (string) - Specifies the annotations for the virtual machine.
+
+- `destroy` (bool) - Specifies whether to destroy the virtual machine after the build is complete.
+  Defaults to `false`.
+
+<!-- End of code generated from the comments of the CreateConfig struct in builder/vsphere/iso/step_create.go; -->
+
+
+### ISO Configuration
+
+<!-- Code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; DO NOT EDIT MANUALLY -->
+
+By default, Packer will symlink, download or copy image files to the Packer
+cache into a "`hash($iso_url+$iso_checksum).$iso_target_extension`" file.
+Packer uses [hashicorp/go-getter](https://github.com/hashicorp/go-getter) in
+file mode in order to perform a download.
+
+go-getter supports the following protocols:
+
+* Local files
+* Git
+* Mercurial
+* HTTP
+* Amazon S3
+
+Examples:
+go-getter can guess the checksum type based on `iso_checksum` length, and it is
+also possible to specify the checksum type.
+
+In JSON:
+
+```json
+
+	"iso_checksum": "946a6077af6f5f95a51f82fdc44051c7aa19f9cfc5f737954845a6050543d7c2",
+	"iso_url": "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
+
+```
+
+```json
+
+	"iso_checksum": "file:ubuntu.org/..../ubuntu-14.04.1-server-amd64.iso.sum",
+	"iso_url": "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
+
+```
+
+```json
+
+	"iso_checksum": "file://./shasums.txt",
+	"iso_url": "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
+
+```
+
+```json
+
+	"iso_checksum": "file:./shasums.txt",
+	"iso_url": "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
+
+```
+
+In HCL2:
+
+```hcl
+
+	iso_checksum = "946a6077af6f5f95a51f82fdc44051c7aa19f9cfc5f737954845a6050543d7c2"
+	iso_url = "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
+
+```
+
+```hcl
+
+	iso_checksum = "file:ubuntu.org/..../ubuntu-14.04.1-server-amd64.iso.sum"
+	iso_url = "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
+
+```
+
+```hcl
+
+	iso_checksum = "file://./shasums.txt"
+	iso_url = "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
+
+```
+
+```hcl
+
+	iso_checksum = "file:./shasums.txt",
+	iso_url = "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
+
+```
+
+<!-- End of code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; -->
+
+
+#### Required:
+
+<!-- Code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; DO NOT EDIT MANUALLY -->
+
+- `iso_checksum` (string) - The checksum for the ISO file or virtual hard drive file. The type of
+  the checksum is specified within the checksum field as a prefix, ex:
+  "md5:{$checksum}". The type of the checksum can also be omitted and
+  Packer will try to infer it based on string length. Valid values are
+  "none", "{$checksum}", "md5:{$checksum}", "sha1:{$checksum}",
+  "sha256:{$checksum}", "sha512:{$checksum}" or "file:{$path}". Here is a
+  list of valid checksum values:
+   * md5:090992ba9fd140077b0661cb75f7ce13
+   * 090992ba9fd140077b0661cb75f7ce13
+   * sha1:ebfb681885ddf1234c18094a45bbeafd91467911
+   * ebfb681885ddf1234c18094a45bbeafd91467911
+   * sha256:ed363350696a726b7932db864dda019bd2017365c9e299627830f06954643f93
+   * ed363350696a726b7932db864dda019bd2017365c9e299627830f06954643f93
+   * file:http://releases.ubuntu.com/20.04/SHA256SUMS
+   * file:file://./local/path/file.sum
+   * file:./local/path/file.sum
+   * none
+  Although the checksum will not be verified when it is set to "none",
+  this is not recommended since these files can be very large and
+  corruption does happen from time to time.
+
+- `iso_url` (string) - A URL to the ISO containing the installation image or virtual hard drive
+  (VHD or VHDX) file to clone.
+
+<!-- End of code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; -->
+
+
+#### Optional:
+
+<!-- Code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; DO NOT EDIT MANUALLY -->
+
+- `iso_urls` ([]string) - Multiple URLs for the ISO to download. Packer will try these in order.
+  If anything goes wrong attempting to download or while downloading a
+  single URL, it will move on to the next. All URLs must point to the same
+  file (same checksum). By default this is empty and `iso_url` is used.
+  Only one of `iso_url` or `iso_urls` can be specified.
+
+- `iso_target_path` (string) - The path where the iso should be saved after download. By default will
+  go in the packer cache, with a hash of the original filename and
+  checksum as its name.
+
+- `iso_target_extension` (string) - The extension of the iso file after download. This defaults to `iso`.
+
+<!-- End of code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; -->
+
+
+### CD-ROM Configuration
+
+For each ISO defined in the CD-ROM configuration, a CD-ROM device is added.
+
+If the `iso_url` is defined in addition to the `iso_paths`, the `iso_url` is added to the virtual
+machine first. This keeps the `iso_url` first in the boot order by default, allowing the boot ISO to
+be defined by the `iso_url` and the VMware Tools ISO added from ESXi host.
+
+HCL Example:
+
+```hcl
+iso_urls = [
+  "windows-server.iso",
+  "https://example.com/isos/windows-server.iso"
+]
+
+iso_paths = [
+  "[] /usr/lib/vmware/isoimages/windows.iso"
+]
+```
+
+JSON Example:
+
+```json
+"iso_urls": [
+  "windows-server.iso",
+  "https://example.com/isos/windows-server.iso"
+],
+"iso_paths": [
+    "[] /usr/lib/vmware/isoimages/windows.iso"
+],
+```
+<!-- Code generated from the comments of the CDConfig struct in multistep/commonsteps/extra_iso_config.go; DO NOT EDIT MANUALLY -->
+
+An iso (CD) containing custom files can be made available for your build.
+
+By default, no extra CD will be attached. All files listed in this setting
+get placed into the root directory of the CD and the CD is attached as the
+second CD device.
+
+This config exists to work around modern operating systems that have no
+way to mount floppy disks, which was our previous go-to for adding files at
+boot time.
+
+<!-- End of code generated from the comments of the CDConfig struct in multistep/commonsteps/extra_iso_config.go; -->
+
+
+#### Optional:
+
+<!-- Code generated from the comments of the CDConfig struct in multistep/commonsteps/extra_iso_config.go; DO NOT EDIT MANUALLY -->
+
+- `cd_files` ([]string) - A list of files to place onto a CD that is attached when the VM is
+  booted. This can include either files or directories; any directories
+  will be copied onto the CD recursively, preserving directory structure
+  hierarchy. Symlinks will have the link's target copied into the directory
+  tree on the CD where the symlink was. File globbing is allowed.
+  
+  Usage example (JSON):
+  
+  ```json
+  "cd_files": ["./somedirectory/meta-data", "./somedirectory/user-data"],
+  "cd_label": "cidata",
+  ```
+  
+  Usage example (HCL):
+  
+  ```hcl
+  cd_files = ["./somedirectory/meta-data", "./somedirectory/user-data"]
+  cd_label = "cidata"
+  ```
+  
+  The above will create a CD with two files, user-data and meta-data in the
+  CD root. This specific example is how you would create a CD that can be
+  used for an Ubuntu 20.04 autoinstall.
+  
+  Since globbing is also supported,
+  
+  ```hcl
+  cd_files = ["./somedirectory/*"]
+  cd_label = "cidata"
+  ```
+  
+  Would also be an acceptable way to define the above cd. The difference
+  between providing the directory with or without the glob is whether the
+  directory itself or its contents will be at the CD root.
+  
+  Use of this option assumes that you have a command line tool installed
+  that can handle the iso creation. Packer will use one of the following
+  tools:
+  
+    * xorriso
+    * mkisofs
+    * hdiutil (normally found in macOS)
+    * oscdimg (normally found in Windows as part of the Windows ADK)
+
+- `cd_content` (map[string]string) - Key/Values to add to the CD. The keys represent the paths, and the values
+  contents. It can be used alongside `cd_files`, which is useful to add large
+  files without loading them into memory. If any paths are specified by both,
+  the contents in `cd_content` will take precedence.
+  
+  Usage example (HCL):
+  
+  ```hcl
+  cd_files = ["vendor-data"]
+  cd_content = {
+    "meta-data" = jsonencode(local.instance_data)
+    "user-data" = templatefile("user-data", { packages = ["nginx"] })
+  }
+  cd_label = "cidata"
+  ```
+
+- `cd_label` (string) - CD Label
+
+<!-- End of code generated from the comments of the CDConfig struct in multistep/commonsteps/extra_iso_config.go; -->
+
+
+<!-- Code generated from the comments of the CDRomConfig struct in builder/vsphere/common/step_add_cdrom.go; DO NOT EDIT MANUALLY -->
+
+- `cdrom_type` (string) - Specifies the type of controller to use for the CD-ROM device. Defaults to `ide`.
+  
+  The available options for this setting are: `ide` and `sata`.
+
+- `iso_paths` ([]string) - Specifies a list of paths to ISO files in either a datastore or a content library that will
+  be attached to the virtual machine.
+  
+  HCL Example:
+  
+  ```hcl
+  iso_paths = [
+    "[nfs] iso/ubuntu-server-amd64.iso",
+    "Example Content Library/ubuntu-server-amd64/ubuntu-server-amd64.iso"
+  ]
+  ```
+  
+  JSON Example:
+  
+  ```json
+  "iso_paths": [
+    "[nfs] iso/ubuntu-server-amd64.iso",
+    "Example Content Library/ubuntu-server-amd64/ubuntu-server-amd64.iso"
+  ]
+  ```
+  
+  Two ISOs are referenced:
+  
+  1. An ISO in the "_iso_" folder of the "_nfs_" datastore with the file name of
+     "_ubuntu-server-amd64.iso_".
+  2. An ISO in the "_Example Content Library_" content library with the item name of
+     "_ubuntu-server-amd64_".
+  
+  -> **Note:** All files in a content library have an associated item name. To determine the
+  file name, view the datastore backing the content library or use the `govc` vSphere CLI.
+
+<!-- End of code generated from the comments of the CDRomConfig struct in builder/vsphere/common/step_add_cdrom.go; -->
+
+
+<!-- Code generated from the comments of the RemoveCDRomConfig struct in builder/vsphere/common/step_remove_cdrom.go; DO NOT EDIT MANUALLY -->
+
+- `remove_cdrom` (bool) - Specifies to remove all CD-ROM devices from the virtual machine. Defaults to `false`.
+
+<!-- End of code generated from the comments of the RemoveCDRomConfig struct in builder/vsphere/common/step_remove_cdrom.go; -->
+
+
+<!-- Code generated from the comments of the ReattachCDRomConfig struct in builder/vsphere/common/step_reattach_cdrom.go; DO NOT EDIT MANUALLY -->
+
+- `reattach_cdroms` (int) - Specifies the number of CD-ROM devices to reattach to the final build artifact.
+  Range: 0 - 4. Defaults to 0.
+  
+  -> **Note:** If set to 0, the step is skipped. When set to a value in the range,
+  `remove_cdrom` is ignored and the CD-ROM devices are kept without any attached media.
+
+<!-- End of code generated from the comments of the ReattachCDRomConfig struct in builder/vsphere/common/step_reattach_cdrom.go; -->
+
+
+### Floppy Configuration
+
+#### Optional:
+
+<!-- Code generated from the comments of the FloppyConfig struct in builder/vsphere/common/step_add_floppy.go; DO NOT EDIT MANUALLY -->
+
+- `floppy_img_path` (string) - Datastore path to a floppy image that will be mounted to the VM.
+  Example: `[datastore1] ISO/pvscsi-Windows8.flp`.
+
+- `floppy_files` ([]string) - List of local files to be mounted to the VM floppy drive. Can be used to
+  make Debian preseed or RHEL kickstart files available to the VM.
+
+- `floppy_dirs` ([]string) - List of directories to copy files from.
+
+- `floppy_content` (map[string]string) - Key/Values to add to the floppy disk. The keys represent the paths, and
+  the values contents. It can be used alongside `floppy_files` or
+  `floppy_dirs`, which is useful to add large files without loading them
+  into memory. If any paths are specified by both, the contents in
+  `floppy_content` will take precedence.
+  
+  HCL Example:
+  
+  ```hcl
+  floppy_content = {
+    "meta-data" = jsonencode(local.instance_data)
+    "user-data" = templatefile("user-data", { packages = ["nginx"] })
+  }
+  ```
+
+- `floppy_label` (string) - The label to use for the floppy disk that
+  is attached when the VM is booted. This is most useful for cloud-init,
+  Kickstart or other early initialization tools, which can benefit from labelled floppy disks.
+  By default, the floppy label will be 'packer'.
+
+<!-- End of code generated from the comments of the FloppyConfig struct in builder/vsphere/common/step_add_floppy.go; -->
+
+
+### Network Adapter Configuration
+
+<!-- Code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; DO NOT EDIT MANUALLY -->
+
+Defines a Network Adapter
+If no adapter is defined, network tasks (communicators, most provisioners) won't work, so it's advised to define one.
+
+Example configuration with two network adapters:
+
+HCL Example:
+
+```hcl
+	network_adapters {
+	    network = "VM Network"
+	    network_card = "vmxnet3"
+	}
+	network_adapters {
+	    network = "OtherNetwork"
+	    network_card = "vmxnet3"
+	}
+```
+
+JSON Example:
+
+```json
+	"network_adapters": [
+	  {
+	    "network": "VM Network",
+	    "network_card": "vmxnet3"
+	  },
+	  {
+	    "network": "OtherNetwork",
+	    "network_card": "vmxnet3"
+	  }
+	],
+```
+
+<!-- End of code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; -->
+
+
+#### Required:
+
+<!-- Code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; DO NOT EDIT MANUALLY -->
+
+- `network_card` (string) - Specifies the virtual machine network card type. For example `vmxnet3`.
+
+<!-- End of code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; -->
+
+
+#### Optional:
+
+<!-- Code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; DO NOT EDIT MANUALLY -->
+
+- `network` (string) - Specifies the network to which the virtual machine will connect. If no network is specified,
+  provide `host` to allow Packer to search for an available network. For networks placed
+  within a network folder vCenter Server, provider the object path to the network.
+  For example, `network = "/<DatacenterName>/<FolderName>/<NetworkName>"`.
+
+- `mac_address` (string) - Specifies the network card MAC address. For example `00:50:56:00:00:00`.
+
+- `passthrough` (\*bool) - Specifies whether to enable DirectPath I/O passthrough for the network device.
+
+<!-- End of code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; -->
+
+
+### Storage Configuration
+
+<!-- Code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; DO NOT EDIT MANUALLY -->
+
+The following example that will create a 15GB and a 20GB disk on the virtual machine.
+The second disk will be thin provisioned:
+
+HCL Example:
+
+```hcl
+	storage {
+	    disk_size = 15000
+	}
+	storage {
+	    disk_size = 20000
+	    disk_thin_provisioned = true
+	}
+```
+
+JSON Example:
+
+```json
+	"storage": [
+	  {
+	    "disk_size": 15000
+	  },
+	  {
+	    "disk_size": 20000,
+	    "disk_thin_provisioned": true
+	  }
+	],
+```
+
+The following example will use two PVSCSI controllers and two disks on each controller.
+
+HCL Example:
+
+```hcl
+	disk_controller_type = ["pvscsi", "pvscsi"]
+	storage {
+	   disk_size = 15000,
+	   disk_controller_index = 0
+	}
+	storage {
+	   disk_size = 15000
+	   disk_controller_index = 0
+	}
+	storage {
+	   disk_size = 15000
+	   disk_controller_index = 1
+	}
+	storage {
+	   disk_size = 15000
+	   disk_controller_index = 1
+	}
+```
+
+JSON Example:
+
+```json
+	"disk_controller_type": ["pvscsi", "pvscsi"],
+	"storage": [
+	  {
+	    "disk_size": 15000,
+	    "disk_controller_index": 0
+	  },
+	  {
+	    "disk_size": 15000,
+	    "disk_controller_index": 0
+	  },
+	  {
+	    "disk_size": 15000,
+	    "disk_controller_index": 1
+	  },
+	  {
+	    "disk_size": 15000,
+	    "disk_controller_index": 1
+	  }
+	],
+```
+
+<!-- End of code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; -->
+
+
+#### Required:
+
+<!-- Code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; DO NOT EDIT MANUALLY -->
+
+- `disk_size` (int64) - Specifics the size of the disk in MiB.
+
+<!-- End of code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; -->
+
+
+#### Optional:
+
+<!-- Code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; DO NOT EDIT MANUALLY -->
+
+- `disk_thin_provisioned` (bool) - Specifies to enable VMDK thin provisioning for the disk. Defaults to `false`.
+
+- `disk_eagerly_scrub` (bool) - Specifies to enable VMDK eager scrubbing for the disk. Defaults to `false`.
+
+- `disk_controller_index` (int) - Specifies the assigned disk controller for the disk. Defaults to the first controller, `(0)`.
+
+<!-- End of code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; -->
+
+
+<!-- Code generated from the comments of the StorageConfig struct in builder/vsphere/common/storage_config.go; DO NOT EDIT MANUALLY -->
+
+- `disk_controller_type` ([]string) - Specifies the disk controller type. One of `lsilogic`, `lsilogic-sas`, `pvscsi`, `nvme`, or `scsi`. Defaults to `lsilogic`.
+  Use a list to define additional controllers.
+  Refer to [SCSI, SATA, and NVMe Storage Controller Conditions, Limitations, and Compatibility](https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-5872D173-A076-42FE-8D0B-9DB0EB0E7362.html)
+  for additional information.
+
+- `storage` ([]DiskConfig) - Specified a collection of one or more disks to be provisioned. Refer to the [Storage Configuration](#storage-configuration) section for additional information.
+
+<!-- End of code generated from the comments of the StorageConfig struct in builder/vsphere/common/storage_config.go; -->
+
+
+### Flag Configuration
+
+#### Optional:
+
+<!-- Code generated from the comments of the FlagConfig struct in builder/vsphere/common/step_add_flag.go; DO NOT EDIT MANUALLY -->
+
+- `vbs_enabled` (bool) - Enable Virtualization Based Security option for virtual machine. Defaults to `false`.
+  Requires `vvtd_enabled` and `NestedHV` to be set to `true`.
+  Requires `firmware` to be set to `efi-secure`.
+
+- `vvtd_enabled` (bool) - Enable IO/MMU option for virtual machine. Defaults to `false`.
+
+<!-- End of code generated from the comments of the FlagConfig struct in builder/vsphere/common/step_add_flag.go; -->
+
+
+### Boot Configuration
 
 <!-- Code generated from the comments of the BootConfig struct in bootcommand/config.go; DO NOT EDIT MANUALLY -->
 
@@ -195,26 +954,11 @@ For more examples of various boot commands, see the sample projects from our
 <!-- End of code generated from the comments of the BootConfig struct in bootcommand/config.go; -->
 
 
-We send each character to the VM with a default delay of 100ms between groups.
-The delay alleviates possible issues with latency and CPU
-contention. If you notice missing keys, you can tune this delay by specifying
-"boot_keygroup_interval" in your Packer template, for example:
+Packer sends each character to the virtual machine with a default delay of 100ms between groups. The
+delay alleviates possible issues with latency and CPU contention. If you notice missing keys, you
+can tune this delay by specifying `boot_keygroup_interval` in your template.
 
-**JSON**
-
-```json
-{
-  "builders": [
-    {
-      "type": "vsphere-iso",
-      "boot_keygroup_interval": "500ms"
-      ...
-    }
-  ]
-}
-```
-
-**HCL2**
+HCL Example:
 
 ```hcl
 source "vsphere-iso" "example" {
@@ -223,8 +967,32 @@ source "vsphere-iso" "example" {
 }
 ```
 
+JSON Example:
 
-## Optional:
+```json
+{
+  "builders": [
+    {
+      "type": "vsphere-iso",
+      "boot_keygroup_interval": "500ms"
+    }
+  ]
+}
+```
+
+#### Optional:
+
+<!-- Code generated from the comments of the RunConfig struct in builder/vsphere/common/step_run.go; DO NOT EDIT MANUALLY -->
+
+- `boot_order` (string) - Specifies the priority of boot devices. Defaults to `disk,cdrom`.
+  
+  The available boot devices are: `floppy`, `cdrom`, `ethernet`, and `disk`.
+  
+  -> **Note:** If not set, the boot order is temporarily set to `disk,cdrom` for the duration
+  of the build and then cleared upon completion.
+
+<!-- End of code generated from the comments of the RunConfig struct in builder/vsphere/common/step_run.go; -->
+
 
 <!-- Code generated from the comments of the BootConfig struct in bootcommand/config.go; DO NOT EDIT MANUALLY -->
 
@@ -258,226 +1026,10 @@ source "vsphere-iso" "example" {
 <!-- End of code generated from the comments of the BootConfig struct in builder/vsphere/common/step_boot_command.go; -->
 
 
-## Http directory configuration
 
-<!-- Code generated from the comments of the HTTPConfig struct in multistep/commonsteps/http_config.go; DO NOT EDIT MANUALLY -->
+### Wait Configuration
 
-Packer will create an http server serving `http_directory` when it is set, a
-random free port will be selected and the architecture of the directory
-referenced will be available in your builder.
-
-Example usage from a builder:
-
-```
-wget http://{{ .HTTPIP }}:{{ .HTTPPort }}/foo/bar/preseed.cfg
-```
-
-<!-- End of code generated from the comments of the HTTPConfig struct in multistep/commonsteps/http_config.go; -->
-
-
-## Optional:
-
-<!-- Code generated from the comments of the HTTPConfig struct in multistep/commonsteps/http_config.go; DO NOT EDIT MANUALLY -->
-
-- `http_directory` (string) - Path to a directory to serve using an HTTP server. The files in this
-  directory will be available over HTTP that will be requestable from the
-  virtual machine. This is useful for hosting kickstart files and so on.
-  By default this is an empty string, which means no HTTP server will be
-  started. The address and port of the HTTP server will be available as
-  variables in `boot_command`. This is covered in more detail below.
-
-- `http_content` (map[string]string) - Key/Values to serve using an HTTP server. `http_content` works like and
-  conflicts with `http_directory`. The keys represent the paths and the
-  values contents, the keys must start with a slash, ex: `/path/to/file`.
-  `http_content` is useful for hosting kickstart files and so on. By
-  default this is empty, which means no HTTP server will be started. The
-  address and port of the HTTP server will be available as variables in
-  `boot_command`. This is covered in more detail below.
-  Example:
-  ```hcl
-    http_content = {
-      "/a/b"     = file("http/b")
-      "/foo/bar" = templatefile("${path.root}/preseed.cfg", { packages = ["nginx"] })
-    }
-  ```
-
-- `http_port_min` (int) - These are the minimum and maximum port to use for the HTTP server
-  started to serve the `http_directory`. Because Packer often runs in
-  parallel, Packer will choose a randomly available port in this range to
-  run the HTTP server. If you want to force the HTTP server to be on one
-  port, make this minimum and maximum port the same. By default the values
-  are `8000` and `9000`, respectively.
-
-- `http_port_max` (int) - HTTP Port Max
-
-- `http_bind_address` (string) - This is the bind address for the HTTP server. Defaults to 0.0.0.0 so that
-  it will work with any network interface.
-
-<!-- End of code generated from the comments of the HTTPConfig struct in multistep/commonsteps/http_config.go; -->
-
-
-## Floppy configuration
-
-<!-- Code generated from the comments of the FloppyConfig struct in builder/vsphere/common/step_add_floppy.go; DO NOT EDIT MANUALLY -->
-
-- `floppy_img_path` (string) - Datastore path to a floppy image that will be mounted to the VM.
-  Example: `[datastore1] ISO/pvscsi-Windows8.flp`.
-
-- `floppy_files` ([]string) - List of local files to be mounted to the VM floppy drive. Can be used to
-  make Debian preseed or RHEL kickstart files available to the VM.
-
-- `floppy_dirs` ([]string) - List of directories to copy files from.
-
-- `floppy_content` (map[string]string) - Key/Values to add to the floppy disk. The keys represent the paths, and
-  the values contents. It can be used alongside `floppy_files` or
-  `floppy_dirs`, which is useful to add large files without loading them
-  into memory. If any paths are specified by both, the contents in
-  `floppy_content` will take precedence.
-  
-  Usage example (HCL):
-  
-  ```hcl
-  floppy_content = {
-    "meta-data" = jsonencode(local.instance_data)
-    "user-data" = templatefile("user-data", { packages = ["nginx"] })
-  }
-  ```
-
-- `floppy_label` (string) - The label to use for the floppy disk that
-  is attached when the VM is booted. This is most useful for cloud-init,
-  Kickstart or other early initialization tools, which can benefit from labelled floppy disks.
-  By default, the floppy label will be 'packer'.
-
-<!-- End of code generated from the comments of the FloppyConfig struct in builder/vsphere/common/step_add_floppy.go; -->
-
-
-## Connection Configuration
-
-<!-- Code generated from the comments of the ConnectConfig struct in builder/vsphere/common/step_connect.go; DO NOT EDIT MANUALLY -->
-
-- `vcenter_server` (string) - vCenter Server hostname.
-
-- `username` (string) - vSphere username.
-
-- `password` (string) - vSphere password.
-
-- `insecure_connection` (bool) - Do not validate the vCenter Server TLS certificate. Defaults to `false`.
-
-- `datacenter` (string) - vSphere datacenter name. Required if there is more than one datacenter in the vSphere inventory.
-
-<!-- End of code generated from the comments of the ConnectConfig struct in builder/vsphere/common/step_connect.go; -->
-
-
-## Hardware Configuration
-
-<!-- Code generated from the comments of the HardwareConfig struct in builder/vsphere/common/step_hardware.go; DO NOT EDIT MANUALLY -->
-
-- `CPUs` (int32) - Number of CPU cores.
-
-- `cpu_cores` (int32) - Number of CPU cores per socket.
-
-- `CPU_reservation` (int64) - Amount of reserved CPU resources in MHz.
-
-- `CPU_limit` (int64) - Upper limit of available CPU resources in MHz.
-
-- `CPU_hot_plug` (bool) - Enable CPU hot plug setting for virtual machine. Defaults to `false`.
-
-- `RAM` (int64) - Amount of RAM in MB.
-
-- `RAM_reservation` (int64) - Amount of reserved RAM in MB.
-
-- `RAM_reserve_all` (bool) - Reserve all available RAM. Defaults to `false`. Cannot be used together
-  with `RAM_reservation`.
-
-- `RAM_hot_plug` (bool) - Enable RAM hot plug setting for virtual machine. Defaults to `false`.
-
-- `video_ram` (int64) - Amount of video memory in KB. See [vSphere documentation](https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-789C3913-1053-4850-A0F0-E29C3D32B6DA.html)
-  for supported maximums. Defaults to 4096 KB.
-
-- `displays` (int32) - Number of video displays. See [vSphere documentation](https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-789C3913-1053-4850-A0F0-E29C3D32B6DA.html)
-  for supported maximums. Defaults to 1.
-
-- `vgpu_profile` (string) - vGPU profile for accelerated graphics. See [NVIDIA GRID vGPU documentation](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#configure-vmware-vsphere-vm-with-vgpu)
-  for examples of profile names. Defaults to none.
-
-- `NestedHV` (bool) - Enable nested hardware virtualization for VM. Defaults to `false`.
-
-- `firmware` (string) - Set the Firmware for virtual machine. Supported values: `bios`, `efi` or `efi-secure`. Defaults to `bios`.
-
-- `force_bios_setup` (bool) - During the boot, force entry into the BIOS setup screen. Defaults to `false`.
-
-- `vTPM` (bool) - Add virtual TPM device for virtual machine. Defaults to `false`.
-
-- `precision_clock` (string) - Add a precision clock device for virtual machine. Defaults to `none`.
-
-<!-- End of code generated from the comments of the HardwareConfig struct in builder/vsphere/common/step_hardware.go; -->
-
-
-## Location Configuration
-
-<!-- Code generated from the comments of the LocationConfig struct in builder/vsphere/common/config_location.go; DO NOT EDIT MANUALLY -->
-
-- `vm_name` (string) - Name of the virtual machine.
-
-- `folder` (string) - VM folder where the virtual machine is created.
-
-- `cluster` (string) - vSphere cluster where the virtual machine is created. See the
-  [Working With Clusters And Hosts](#working-with-clusters-and-hosts)
-  section above for more details.
-
-- `host` (string) - ESXi host where the virtual machine is created. A full path must be
-  specified if the host is in a folder. For example `folder/host`. See the
-  [Working With Clusters And Hosts](#working-with-clusters-and-hosts)
-  section above for more details.
-
-- `resource_pool` (string) - vSphere resource pool where the virtual machine is created.
-  If this is not specified, the root resource pool associated with the
-  `host` or `cluster` is used.
-  Note that the full path to the resource pool must be provided.
-  For example, a simple resource pool path might resemble `rp-packer` and
-  a nested path might resemble 'rp-packer/rp-linux-images'.
-
-- `datastore` (string) - vSphere datastore where the virtual machine is created.
-  Required if `host` is a cluster, or if `host` has multiple datastores.
-
-- `set_host_for_datastore_uploads` (bool) - Specifies that the host is used for uploading files to the datastore.
-  Defaults to false.
-
-<!-- End of code generated from the comments of the LocationConfig struct in builder/vsphere/common/config_location.go; -->
-
-
-## Run Configuration
-
-<!-- Code generated from the comments of the RunConfig struct in builder/vsphere/common/step_run.go; DO NOT EDIT MANUALLY -->
-
-- `boot_order` (string) - Priority of boot devices. Defaults to `disk,cdrom`
-
-<!-- End of code generated from the comments of the RunConfig struct in builder/vsphere/common/step_run.go; -->
-
-
-## Shutdown Configuration
-
-<!-- Code generated from the comments of the ShutdownConfig struct in builder/vsphere/common/step_shutdown.go; DO NOT EDIT MANUALLY -->
-
-- `shutdown_command` (string) - Specify a VM guest shutdown command. This command will be executed using
-  the `communicator`. Otherwise, the VMware Tools are used to gracefully shutdown
-  the VM.
-
-- `shutdown_timeout` (duration string | ex: "1h5m2s") - Amount of time to wait for graceful VM shutdown.
-  Defaults to 5m or five minutes.
-  This will likely need to be modified if the `communicator` is 'none'.
-
-- `disable_shutdown` (bool) - Packer normally halts the virtual machine after all provisioners have
-  run when no `shutdown_command` is defined. If this is set to `true`, Packer
-  *will not* halt the virtual machine but will assume that you will send the stop
-  signal yourself through a preseed.cfg, a script or the final provisioner.
-  Packer will wait for a default of five minutes until the virtual machine is shutdown.
-  The timeout can be changed using `shutdown_timeout` option.
-
-<!-- End of code generated from the comments of the ShutdownConfig struct in builder/vsphere/common/step_shutdown.go; -->
-
-
-## Wait Configuration
+#### Optional:
 
 <!-- Code generated from the comments of the WaitIpConfig struct in builder/vsphere/common/step_wait_for_ip.go; DO NOT EDIT MANUALLY -->
 
@@ -503,536 +1055,37 @@ wget http://{{ .HTTPIP }}:{{ .HTTPPort }}/foo/bar/preseed.cfg
 <!-- End of code generated from the comments of the WaitIpConfig struct in builder/vsphere/common/step_wait_for_ip.go; -->
 
 
-## ISO Configuration
+### Shutdown Configuration
 
-<!-- Code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; DO NOT EDIT MANUALLY -->
+<!-- Code generated from the comments of the ShutdownConfig struct in builder/vsphere/common/step_shutdown.go; DO NOT EDIT MANUALLY -->
 
-By default, Packer will symlink, download or copy image files to the Packer
-cache into a "`hash($iso_url+$iso_checksum).$iso_target_extension`" file.
-Packer uses [hashicorp/go-getter](https://github.com/hashicorp/go-getter) in
-file mode in order to perform a download.
+- `shutdown_command` (string) - Specify a VM guest shutdown command. This command will be executed using
+  the `communicator`. Otherwise, the VMware Tools are used to gracefully shutdown
+  the VM.
 
-go-getter supports the following protocols:
+- `shutdown_timeout` (duration string | ex: "1h5m2s") - Amount of time to wait for graceful VM shutdown.
+  Defaults to 5m or five minutes.
+  This will likely need to be modified if the `communicator` is 'none'.
 
-* Local files
-* Git
-* Mercurial
-* HTTP
-* Amazon S3
+- `disable_shutdown` (bool) - Packer normally halts the virtual machine after all provisioners have
+  run when no `shutdown_command` is defined. If this is set to `true`, Packer
+  *will not* halt the virtual machine but will assume that you will send the stop
+  signal yourself through a preseed.cfg, a script or the final provisioner.
+  Packer will wait for a default of five minutes until the virtual machine is shutdown.
+  The timeout can be changed using `shutdown_timeout` option.
 
-Examples:
-go-getter can guess the checksum type based on `iso_checksum` length, and it is
-also possible to specify the checksum type.
+<!-- End of code generated from the comments of the ShutdownConfig struct in builder/vsphere/common/step_shutdown.go; -->
 
-In JSON:
 
-```json
-
-	"iso_checksum": "946a6077af6f5f95a51f82fdc44051c7aa19f9cfc5f737954845a6050543d7c2",
-	"iso_url": "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
-
-```
-
-```json
-
-	"iso_checksum": "file:ubuntu.org/..../ubuntu-14.04.1-server-amd64.iso.sum",
-	"iso_url": "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
-
-```
-
-```json
-
-	"iso_checksum": "file://./shasums.txt",
-	"iso_url": "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
-
-```
-
-```json
-
-	"iso_checksum": "file:./shasums.txt",
-	"iso_url": "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
-
-```
-
-In HCL2:
-
-```hcl
-
-	iso_checksum = "946a6077af6f5f95a51f82fdc44051c7aa19f9cfc5f737954845a6050543d7c2"
-	iso_url = "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
-
-```
-
-```hcl
-
-	iso_checksum = "file:ubuntu.org/..../ubuntu-14.04.1-server-amd64.iso.sum"
-	iso_url = "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
-
-```
-
-```hcl
-
-	iso_checksum = "file://./shasums.txt"
-	iso_url = "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
-
-```
-
-```hcl
-
-	iso_checksum = "file:./shasums.txt",
-	iso_url = "ubuntu.org/.../ubuntu-14.04.1-server-amd64.iso"
-
-```
-
-<!-- End of code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; -->
-
-
-## Required:
-
-<!-- Code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; DO NOT EDIT MANUALLY -->
-
-- `iso_checksum` (string) - The checksum for the ISO file or virtual hard drive file. The type of
-  the checksum is specified within the checksum field as a prefix, ex:
-  "md5:{$checksum}". The type of the checksum can also be omitted and
-  Packer will try to infer it based on string length. Valid values are
-  "none", "{$checksum}", "md5:{$checksum}", "sha1:{$checksum}",
-  "sha256:{$checksum}", "sha512:{$checksum}" or "file:{$path}". Here is a
-  list of valid checksum values:
-   * md5:090992ba9fd140077b0661cb75f7ce13
-   * 090992ba9fd140077b0661cb75f7ce13
-   * sha1:ebfb681885ddf1234c18094a45bbeafd91467911
-   * ebfb681885ddf1234c18094a45bbeafd91467911
-   * sha256:ed363350696a726b7932db864dda019bd2017365c9e299627830f06954643f93
-   * ed363350696a726b7932db864dda019bd2017365c9e299627830f06954643f93
-   * file:http://releases.ubuntu.com/20.04/SHA256SUMS
-   * file:file://./local/path/file.sum
-   * file:./local/path/file.sum
-   * none
-  Although the checksum will not be verified when it is set to "none",
-  this is not recommended since these files can be very large and
-  corruption does happen from time to time.
-
-- `iso_url` (string) - A URL to the ISO containing the installation image or virtual hard drive
-  (VHD or VHDX) file to clone.
-
-<!-- End of code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; -->
-
-
-## Optional:
-
-<!-- Code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; DO NOT EDIT MANUALLY -->
-
-- `iso_urls` ([]string) - Multiple URLs for the ISO to download. Packer will try these in order.
-  If anything goes wrong attempting to download or while downloading a
-  single URL, it will move on to the next. All URLs must point to the same
-  file (same checksum). By default this is empty and `iso_url` is used.
-  Only one of `iso_url` or `iso_urls` can be specified.
-
-- `iso_target_path` (string) - The path where the iso should be saved after download. By default will
-  go in the packer cache, with a hash of the original filename and
-  checksum as its name.
-
-- `iso_target_extension` (string) - The extension of the iso file after download. This defaults to `iso`.
-
-<!-- End of code generated from the comments of the ISOConfig struct in multistep/commonsteps/iso_config.go; -->
-
-
-## CDRom Configuration
-
-Each iso defined in the CDRom Configuration adds a new drive. If the "iso_url" is defined in
-addition to the "iso_paths", the "iso_url" is added to the VM first. This keeps the "iso_url" first in
-the boot order by default allowing the boot iso being defined by the iso_url and the vmware tools iso added
-from the datastore. Example:
-
-**JSON**
-
-```json
-"iso_urls": [
-  "win10.iso",
-  "http://example.org/isos/win10.iso"
-],
-"iso_paths": [
-    "[] /usr/lib/vmware/isoimages/windows.iso"
-],
-```
-
-**HCL2**
-
-```hcl
-iso_urls = [
-  "win10.iso",
-  "http://example.org/isos/win10.iso"
-]
-
-iso_paths = [
-    "[] /usr/lib/vmware/isoimages/windows.iso"
-]
-```
-
-
-<!-- Code generated from the comments of the CDRomConfig struct in builder/vsphere/common/step_add_cdrom.go; DO NOT EDIT MANUALLY -->
-
-- `cdrom_type` (string) - Which controller to use. Example: `sata`. Defaults to `ide`.
-
-- `iso_paths` ([]string) - A list of paths to ISO files in either a datastore or a content library that will be mounted to the VM.
-  
-  Usage example (HCL):
-  
-  ```hcl
-  iso_paths = [
-    "[nfs] iso/ubuntu-server-amd64.iso",
-    "Packer/ubuntu-server-amd64/ubuntu-server-amd64.iso"
-  ]
-  ```
-  
-  Two ISOs are referenced:
-  1. An ISO in the "_iso_" folder of the "_nfs_" datastore with the file name of "_ubuntu-server-amd64.iso_".
-  2. An ISO in the "_Packer_" content library with the item name of "_ubuntu-server-amd64_".
-  
-  -> **Note:** All files in a content library have an associated item name.
-  To determine the file name, view the datastore backing the content library or use the `govc` vSphere CLI.
-
-<!-- End of code generated from the comments of the CDRomConfig struct in builder/vsphere/common/step_add_cdrom.go; -->
-
-
-<!-- Code generated from the comments of the RemoveCDRomConfig struct in builder/vsphere/common/step_remove_cdrom.go; DO NOT EDIT MANUALLY -->
-
-- `remove_cdrom` (bool) - Remove CD-ROM devices from template. Defaults to `false`.
-
-<!-- End of code generated from the comments of the RemoveCDRomConfig struct in builder/vsphere/common/step_remove_cdrom.go; -->
-
-
-<!-- Code generated from the comments of the CDConfig struct in multistep/commonsteps/extra_iso_config.go; DO NOT EDIT MANUALLY -->
-
-An iso (CD) containing custom files can be made available for your build.
-
-By default, no extra CD will be attached. All files listed in this setting
-get placed into the root directory of the CD and the CD is attached as the
-second CD device.
-
-This config exists to work around modern operating systems that have no
-way to mount floppy disks, which was our previous go-to for adding files at
-boot time.
-
-<!-- End of code generated from the comments of the CDConfig struct in multistep/commonsteps/extra_iso_config.go; -->
-
-
-## Optional:
-
-<!-- Code generated from the comments of the CDConfig struct in multistep/commonsteps/extra_iso_config.go; DO NOT EDIT MANUALLY -->
-
-- `cd_files` ([]string) - A list of files to place onto a CD that is attached when the VM is
-  booted. This can include either files or directories; any directories
-  will be copied onto the CD recursively, preserving directory structure
-  hierarchy. Symlinks will have the link's target copied into the directory
-  tree on the CD where the symlink was. File globbing is allowed.
-  
-  Usage example (JSON):
-  
-  ```json
-  "cd_files": ["./somedirectory/meta-data", "./somedirectory/user-data"],
-  "cd_label": "cidata",
-  ```
-  
-  Usage example (HCL):
-  
-  ```hcl
-  cd_files = ["./somedirectory/meta-data", "./somedirectory/user-data"]
-  cd_label = "cidata"
-  ```
-  
-  The above will create a CD with two files, user-data and meta-data in the
-  CD root. This specific example is how you would create a CD that can be
-  used for an Ubuntu 20.04 autoinstall.
-  
-  Since globbing is also supported,
-  
-  ```hcl
-  cd_files = ["./somedirectory/*"]
-  cd_label = "cidata"
-  ```
-  
-  Would also be an acceptable way to define the above cd. The difference
-  between providing the directory with or without the glob is whether the
-  directory itself or its contents will be at the CD root.
-  
-  Use of this option assumes that you have a command line tool installed
-  that can handle the iso creation. Packer will use one of the following
-  tools:
-  
-    * xorriso
-    * mkisofs
-    * hdiutil (normally found in macOS)
-    * oscdimg (normally found in Windows as part of the Windows ADK)
-
-- `cd_content` (map[string]string) - Key/Values to add to the CD. The keys represent the paths, and the values
-  contents. It can be used alongside `cd_files`, which is useful to add large
-  files without loading them into memory. If any paths are specified by both,
-  the contents in `cd_content` will take precedence.
-  
-  Usage example (HCL):
-  
-  ```hcl
-  cd_files = ["vendor-data"]
-  cd_content = {
-    "meta-data" = jsonencode(local.instance_data)
-    "user-data" = templatefile("user-data", { packages = ["nginx"] })
-  }
-  cd_label = "cidata"
-  ```
-
-- `cd_label` (string) - CD Label
-
-<!-- End of code generated from the comments of the CDConfig struct in multistep/commonsteps/extra_iso_config.go; -->
-
-
-## Create Configuration
-
-<!-- Code generated from the comments of the CreateConfig struct in builder/vsphere/iso/step_create.go; DO NOT EDIT MANUALLY -->
-
-- `vm_version` (uint) - Specifies the virtual machine hardware version. Defaults to the most current virtual machine
-  hardware version supported by the ESXi host.
-  Refer to [VMware KB article 1003746](https://kb.vmware.com/s/article/1003746) for the list
-  of supported virtual machine hardware versions.
-
-- `guest_os_type` (string) - Specifies the guest operating system identifier for the virtual machine.
-  If not specified, the setting defaults to `otherGuest`.
-  
-  To get a list of supported guest operating system identifiers for your ESXi host,
-  run the following PowerShell command using `VMware.PowerCLI`:
-  
-  ```powershell
-  Connect-VIServer -Server "vc.example.com" -User "administrator@vsphere" -Password "password"
-  $esxiHost = Get-VMHost -Name "esxi.example.com"
-  $environmentBrowser = Get-View -Id $esxiHost.ExtensionData.Parent.ExtensionData.ConfigManager.EnvironmentBrowser
-  $vmxVersion = ($environmentBrowser.QueryConfigOptionDescriptor() | Where-Object DefaultConfigOption).Key
-  $osDescriptor = $environmentBrowser.QueryConfigOption($vmxVersion, $null).GuestOSDescriptor
-  $osDescriptor | Select-Object Id, Fullname
-  ```
-
-- `network_adapters` ([]NIC) - Specifies the network adapters for the virtual machine.
-  If no network adapter is defined, all network-related operations will be skipped.
-
-- `usb_controller` ([]string) - Specifies the USB controllers for the virtual machine. Use `usb` for a USB 2.0 controller and
-  `xhci`` for a USB 3.0 controller.
-  -> **Note:** Maximum of one controller of each type.
-
-- `notes` (string) - Specifies the annotations for the virtual machine.
-
-- `destroy` (bool) - Specifies whether to destroy the virtual machine after the build is complete.
-
-<!-- End of code generated from the comments of the CreateConfig struct in builder/vsphere/iso/step_create.go; -->
-
-
-<!-- Code generated from the comments of the StorageConfig struct in builder/vsphere/common/storage_config.go; DO NOT EDIT MANUALLY -->
-
-- `disk_controller_type` ([]string) - Set VM disk controller type. Example `lsilogic`, `lsilogic-sas`, `pvscsi`, `nvme`, or `scsi`. Use a list to define additional controllers.
-  Defaults to `lsilogic`. See
-  [SCSI, SATA, and NVMe Storage Controller Conditions, Limitations, and Compatibility](https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-5872D173-A076-42FE-8D0B-9DB0EB0E7362.html)
-  for additional details.
-
-- `storage` ([]DiskConfig) - Configures a collection of one or more disks to be provisioned along with the VM. See the [Storage Configuration](#storage-configuration).
-
-<!-- End of code generated from the comments of the StorageConfig struct in builder/vsphere/common/storage_config.go; -->
-
-
-## Network Adapter Configuration
-
-<!-- Code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; DO NOT EDIT MANUALLY -->
-
-Defines a Network Adapter
-If no adapter is defined, network tasks (communicators, most provisioners) won't work, so it's advised to define one.
-
-Example that creates two network adapters:
-
-In JSON:
-```json
-
-	"network_adapters": [
-	  {
-	    "network": "VM Network",
-	    "network_card": "vmxnet3"
-	  },
-	  {
-	    "network": "OtherNetwork",
-	    "network_card": "vmxnet3"
-	  }
-	],
-
-```
-In HCL2:
-```hcl
-
-	network_adapters {
-	    network = "VM Network"
-	    network_card = "vmxnet3"
-	}
-	network_adapters {
-	    network = "OtherNetwork"
-	    network_card = "vmxnet3"
-	}
-
-```
-
-<!-- End of code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; -->
-
-
-<!-- Code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; DO NOT EDIT MANUALLY -->
-
-- `network_card` (string) - Specifies the virtual machine network card type. For example `vmxnet3`.
-
-<!-- End of code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; -->
-
-
-## Optional
-
-<!-- Code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; DO NOT EDIT MANUALLY -->
-
-- `network` (string) - Specifies the network to which the virtual machine will connect. If no network is specified,
-  provide 'host' to allow Packer to search for an available network. For networks placed
-  within a network folder vCenter Server, provider the object path to the network.
-  For example, `network = "/<DatacenterName>/<FolderName>/<NetworkName>"`.
-
-- `mac_address` (string) - Specifies the network card MAC address. For example `00:50:56:00:00:00`.
-
-- `passthrough` (\*bool) - Specifies whether to enable DirectPath I/O passthrough for the network device.
-
-<!-- End of code generated from the comments of the NIC struct in builder/vsphere/iso/step_create.go; -->
-
-
-## Storage Configuration
-
-<!-- Code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; DO NOT EDIT MANUALLY -->
-
-Defines the disk storage for a VM.
-
-Example that will create a 15GB and a 20GB disk on the VM. The second disk will be thin provisioned:
-
-In JSON:
-```json
-
-	"storage": [
-	  {
-	    "disk_size": 15000
-	  },
-	  {
-	    "disk_size": 20000,
-	    "disk_thin_provisioned": true
-	  }
-	],
-
-```
-In HCL2:
-```hcl
-
-	storage {
-	    disk_size = 15000
-	}
-	storage {
-	    disk_size = 20000
-	    disk_thin_provisioned = true
-	}
-
-```
-
-Example that creates 2 pvscsi controllers and adds 2 disks to each one:
-
-In JSON:
-```json
-
-	"disk_controller_type": ["pvscsi", "pvscsi"],
-	"storage": [
-	  {
-	    "disk_size": 15000,
-	    "disk_controller_index": 0
-	  },
-	  {
-	    "disk_size": 15000,
-	    "disk_controller_index": 0
-	  },
-	  {
-	    "disk_size": 15000,
-	    "disk_controller_index": 1
-	  },
-	  {
-	    "disk_size": 15000,
-	    "disk_controller_index": 1
-	  }
-	],
-
-```
-
-In HCL2:
-```hcl
-
-	disk_controller_type = ["pvscsi", "pvscsi"]
-	storage {
-	   disk_size = 15000,
-	   disk_controller_index = 0
-	}
-	storage {
-	   disk_size = 15000
-	   disk_controller_index = 0
-	}
-	storage {
-	   disk_size = 15000
-	   disk_controller_index = 1
-	}
-	storage {
-	   disk_size = 15000
-	   disk_controller_index = 1
-	}
-
-```
-
-<!-- End of code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; -->
-
-
-<!-- Code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; DO NOT EDIT MANUALLY -->
-
-- `disk_size` (int64) - The size of the disk in MiB.
-
-<!-- End of code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; -->
-
-
-## Optional
-
-<!-- Code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; DO NOT EDIT MANUALLY -->
-
-- `disk_thin_provisioned` (bool) - Enable VMDK thin provisioning for VM. Defaults to `false`.
-
-- `disk_eagerly_scrub` (bool) - Enable VMDK eager scrubbing for VM. Defaults to `false`.
-
-- `disk_controller_index` (int) - The assigned disk controller. Defaults to the first one (0).
-
-<!-- End of code generated from the comments of the DiskConfig struct in builder/vsphere/common/storage_config.go; -->
-
-
-## Export Configuration
+### Export Configuration
 
 <!-- Code generated from the comments of the ExportConfig struct in builder/vsphere/common/step_export.go; DO NOT EDIT MANUALLY -->
 
 You can export an image in Open Virtualization Format (OVF) to the Packer host.
 
-Example usage:
+HCL Example:
 
-In JSON:
-```json
-...
-
-	"vm_name": "example-ubuntu",
-
-...
-
-	"export": {
-	  "force": true,
-	  "output_directory": "./output-artifacts"
-	},
-
-```
-In HCL2:
 ```hcl
-
 	# ...
 	vm_name = "example-ubuntu"
 	# ...
@@ -1040,8 +1093,20 @@ In HCL2:
 	  force = true
 	  output_directory = "./output-artifacts"
 	}
-
 ```
+
+JSON Example:
+
+```json
+...
+	"vm_name": "example-ubuntu",
+...
+	"export": {
+	  "force": true,
+	  "output_directory": "./output-artifacts"
+	},
+```
+
 The above configuration would create the following files:
 
 ```text
@@ -1053,49 +1118,63 @@ The above configuration would create the following files:
 <!-- End of code generated from the comments of the ExportConfig struct in builder/vsphere/common/step_export.go; -->
 
 
-## Optional:
+#### Optional:
 
 <!-- Code generated from the comments of the ExportConfig struct in builder/vsphere/common/step_export.go; DO NOT EDIT MANUALLY -->
 
-- `name` (string) - Name of the exported image in Open Virtualization Format (OVF).
-  The name of the virtual machine with the `.ovf` extension is used if this option is not specified.
-
-- `force` (bool) - Forces the export to overwrite existing files. Defaults to false.
-  If set to false, the export will fail if the files already exists.
-
-- `image_files` (bool) - Include additional image files that are that are associated with the virtual machine. Defaults to false.
-  For example, `.nvram` and `.log` files.
-
-- `manifest` (string) - Generate a manifest file with the specified hash algorithm. Defaults to `sha256`.
-  Available options include `none`, `sha1`, `sha256`, and `sha512`. Use `none` for no manifest.
-
-- `options` ([]string) - Advanced image export options. Options can include:
-  * mac - MAC address is exported for each Ethernet device.
-  * uuid - UUID is exported for the virtual machine.
-  * extraconfig - Extra configuration options are exported for the virtual machine.
-  * nodevicesubtypes - Resource subtypes for CD/DVD drives, floppy drives, and serial and parallel ports are not exported.
+- `name` (string) - Specifies the name of the exported image in Open Virtualization Format (OVF).
   
-  For example, adding the following export config option outputs the MAC addresses for each Ethernet device in the OVF descriptor:
+  -> **Note:** The name of the virtual machine with the `.ovf` extension is used if this
+  option is not specified.
+
+- `force` (bool) - Specifies to force the export and overwrite existing files. Defaults to `false`.
   
-  In JSON:
-  ```json
-  ...
-    "export": {
-      "options": ["mac"]
-    },
-  ```
-  In HCL2:
+  -> **Note:** If set to `false`, the export will fail if the files already exist.
+
+- `image_files` (bool) - Specifies to include additional image files that are that are associated with the virtual
+  machine. For example, `.nvram` and `.log` files. Defaults to `false`.
+
+- `manifest` (string) - Specifies the hash algorithm to use when generating a manifest file. Defaults to `sha256`.
+  
+  The available options for this setting are: 'none', 'sha1', 'sha256', and 'sha512'.
+  
+  --> **Tip:** Use `none` to disable the creation of a manifest file.
+
+- `options` ([]string) - Specifies advanced image export configuration options, which include:
+  
+  * `mac` - MAC address is exported for each Ethernet device.
+  * `uuid` - UUID is exported for the virtual machine.
+  * `extraconfig` - Extra configuration options are exported for the virtual machine.
+  * `nodevicesubtypes` - Resource subtypes for CD/DVD drives, floppy drives, and serial and
+    parallel ports are not exported.
+  
+  For example, adding the following export configuration option outputs the MAC addresses for
+  each Ethernet device in the OVF descriptor:
+  
+  HCL Example:
+  
   ```hcl
   ...
     export {
       options = ["mac"]
     }
   ```
+  
+  JSON: Example:
+  
+  ```json
+  ...
+    "export": {
+      "options": ["mac"]
+    },
+  ```
 
 <!-- End of code generated from the comments of the ExportConfig struct in builder/vsphere/common/step_export.go; -->
 
 
-## Output Configuration:
+### Output Configuration
+
+#### Optional:
 
 <!-- Code generated from the comments of the OutputConfig struct in builder/vsphere/common/output_config.go; DO NOT EDIT MANUALLY -->
 
@@ -1117,7 +1196,7 @@ The above configuration would create the following files:
 <!-- End of code generated from the comments of the OutputConfig struct in builder/vsphere/common/output_config.go; -->
 
 
-## Content Library Import Configuration
+### Content Library Import Configuration
 
 <!-- Code generated from the comments of the ContentLibraryDestinationConfig struct in builder/vsphere/common/step_import_to_content_library.go; DO NOT EDIT MANUALLY -->
 
@@ -1127,6 +1206,8 @@ The template is stored in a existing or newly created library item.
 
 <!-- End of code generated from the comments of the ContentLibraryDestinationConfig struct in builder/vsphere/common/step_import_to_content_library.go; -->
 
+
+#### Optional:
 
 <!-- Code generated from the comments of the ContentLibraryDestinationConfig struct in builder/vsphere/common/step_import_to_content_library.go; DO NOT EDIT MANUALLY -->
 
@@ -1181,64 +1262,69 @@ The template is stored in a existing or newly created library item.
 <!-- End of code generated from the comments of the ContentLibraryDestinationConfig struct in builder/vsphere/common/step_import_to_content_library.go; -->
 
 
-Minimal example of usage to import a VM template:
+##### Virtual Machine Template
 
-**JSON**
-
-```json
-	"content_library_destination" : {
-	    "library": "Packer Library Test"
-	}
-```
-
-**HCL2**
+HCL Example:
 
 ```hcl
 	content_library_destination {
-			library = "Packer Library Test"
+			library = "Example Content Library"
 	}
 ```
 
-
-Minimal example of usage to import a OVF template:
-
-**JSON**
+JSON Example:
 
 ```json
 	"content_library_destination" : {
-	    "library": "Packer Library Test",
-	    "ovf": true
+	    "library": "Example Content Library"
 	}
 ```
 
-**HCL2**
+##### OVF Template
+
+HCL Example:
 
 ```hcl
 	content_library_destination {
-			library = "Packer Library Test"
+			library = "Example Content Library"
 			ovf = true
 	}
 ```
 
+JSON Example:
 
-## Extra Configuration Parameters
+```json
+	"content_library_destination" : {
+	    "library": "Example Content Library",
+	    "ovf": true
+	}
+```
+
+### Extra Configuration
+
+#### Optional:
 
 <!-- Code generated from the comments of the ConfigParamsConfig struct in builder/vsphere/common/step_config_params.go; DO NOT EDIT MANUALLY -->
 
-- `configuration_parameters` (map[string]string) - configuration_parameters is a direct passthrough to the vSphere API's
-  ConfigSpec: https://vdc-download.vmware.com/vmwb-repository/dcr-public/bf660c0a-f060-46e8-a94d-4b5e6ffc77ad/208bc706-e281-49b6-a0ce-b402ec19ef82/SDK/vsphere-ws/docs/ReferenceGuide/vim.vm.ConfigSpec.html
+- `configuration_parameters` (map[string]string) - Specifies a direct passthrough to the data object type that encapsulates configuration
+  settings when creating or reconfiguring a virtual machine. Refer to the vSphere API
+  documentation for the [`VirtualMachineConfigSpec`](https://developer.vmware.com/apis/vi-json/latest/data-structures/VirtualMachineConfigSpec/)
+  for available configuration parameters.
 
-- `tools_sync_time` (bool) - Enables time synchronization with the host. Defaults to false.
+- `tools_sync_time` (bool) - Specifies whether to enable time synchronization with the ESXi host where the virtual machine
+  is running. Defaults to `false`.
 
-- `tools_upgrade_policy` (bool) - If sets to true, vSphere will automatically check and upgrade VMware Tools upon a system power cycle.
-  If not set, defaults to manual upgrade.
+- `tools_upgrade_policy` (bool) - Specifies to automatically check for and upgrade VMware Tools following a virtual machine
+  power cycle if an upgrade is available. Defaults to `false`.
 
 <!-- End of code generated from the comments of the ConfigParamsConfig struct in builder/vsphere/common/step_config_params.go; -->
 
 
-## Communicator configuration
+### Communicator Configuration
 
-## Optional common fields:
+#### Optional:
+
+##### Common
 
 <!-- Code generated from the comments of the Config struct in communicator/config.go; DO NOT EDIT MANUALLY -->
 
@@ -1272,7 +1358,7 @@ Minimal example of usage to import a OVF template:
 <!-- End of code generated from the comments of the Config struct in communicator/config.go; -->
 
 
-## Optional SSH fields:
+##### SSH
 
 <!-- Code generated from the comments of the SSH struct in communicator/config.go; DO NOT EDIT MANUALLY -->
 
@@ -1383,7 +1469,7 @@ Minimal example of usage to import a OVF template:
   of current user.
 
 
-## Optional WinRM fields:
+##### Windows Remote Management (WinRM)
 
 <!-- Code generated from the comments of the WinRM struct in communicator/config.go; DO NOT EDIT MANUALLY -->
 
@@ -1422,75 +1508,77 @@ Minimal example of usage to import a OVF template:
 <!-- End of code generated from the comments of the WinRM struct in communicator/config.go; -->
 
 
-## Working With Clusters And Hosts
+## Working with Clusters and Hosts
 
-### Standalone Hosts
+### Standalone ESXi Hosts
 
-Only use the `host` option. Optionally specify a `resource_pool`:
+Only use the `host` option. Optional:ly specify a `resource_pool`:
 
-**JSON**
-
-```json
-"host": "esxi-01.example.com",
-"resource_pool": "pool1",
-```
-
-**HCL2**
+HCL Example:
 
 ```hcl
 host = ""esxi-01.example.com""
-resource_pool = "pool1"
+resource_pool = "example_resource_pool"
 ```
 
+JSON Example:
 
-### Clusters Without DRS
+```json
+"host": "esxi-01.example.com",
+"resource_pool": "example_resource_pool",
+```
+
+### Clusters with Distributed Resource Scheduler (DRS) Enabled
+
+Only use the `cluster` option. Optional:ly specify a `resource_pool`:
+
+HCL Example:
+
+```hcl
+cluster = "cluster-01"
+resource_pool = "example_resource_pool"
+```
+
+JSON Example:
+
+```json
+"cluster": "cluster-01",
+"resource_pool": "example_resource_pool",
+```
+
+### Clusters without Distributed Resource Scheduler (DRS) Enabled
 
 Use the `cluster` and `host`parameters:
 
-**JSON**
-
-```json
-"cluster": "cluster1",
-"host": "esxi-02.example.com",
-```
-
-**HCL2**
+HCL Example:
 
 ```hcl
-cluster = "cluster1"
-host = "esxi-02.example.com"
+cluster = "cluster-01"
+host = "esxi-01.example.com"
 ```
 
-
-### Clusters With DRS
-
-Only use the `cluster` option. Optionally specify a `resource_pool`:
-
-**JSON**
+JSON Example:
 
 ```json
-"cluster": "cluster2",
-"resource_pool": "pool1",
+"cluster": "cluster-01",
+"host": "esxi-01.example.com",
 ```
 
-**HCL2**
+## Privileges
 
-```hcl
-cluster = "cluster2"
-resource_pool = "pool1"
-```
+It is recommended to create a custom vSphere role with the required privileges to integrate Packer
+with vSphere. Accounts or groups can be added to the role to ensure that Packer has least privilege
+access to the infrastructure.
 
+For example, a named service account (_e.g._ `svc-packer-vsphere@example.com`).
 
-## Required vSphere Privileges
-
-It is recommended to create a custom vSphere role with the required privileges to integrate Packer with vSphere. Accounts or groups can be added to the role to ensure that Packer has **_the least privileged_** access to the infrastructure. For example, a named service account (_e.g._ svc-packer-vsphere@example.com).
-
-Clone the default **Read-Only** vSphere role and add the following privileges, which are based on the capabilities of the `vsphere-iso` plugin:
+Clone the default **Read-Only** vSphere role and add the following privileges, which are based on
+the capabilities of the `vsphere-iso` plugin:
 
 Category        | Privilege                                           | Reference
 ----------------|-----------------------------------------------------|---------
 Content Library | Add library item                                    | `ContentLibrary.AddLibraryItem`
- ...            | Update Library Item                                 | `ContentLibrary.UpdateLibraryItem`
+...             | Update Library Item                                 | `ContentLibrary.UpdateLibraryItem`
 Datastore       | Allocate space                                      | `Datastore.AllocateSpace`
 ...             | Browse datastore                                    | `Datastore.Browse`
 ...             | Low level file operations                           | `Datastore.FileManagement`
@@ -1519,17 +1607,29 @@ Virtual Machine | Configuration > Add new disk                        | `Virtual
 ...             | Provisioning > Mark as virtual machine              | `VirtualMachine.Provisioning.MarkAsVM`
 ...             | State > Create snapshot                             | `VirtualMachine.State.CreateSnapshot`
 
-Global permissions **[are required](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.security.doc/GUID-03B36057-B38C-479C-BD78-341CD83A0584.html)** for the content library based on the hierarchical inheritance of permissions. Once the custom vSphere role is created, assign **Global Permissions** in vSphere to the accounts or groups used for the Packer to vSphere integration, if using the content library.
+Global permissions **[are required](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.security.doc/GUID-03B36057-B38C-479C-BD78-341CD83A0584.html)**
+for the content library based on the hierarchical inheritance of permissions. Once the custom
+vSphere role is created, assign **Global Permissions** in vSphere to the accounts or groups used for
+the Packer to vSphere integration, if using the content library.
 
 For example:
 
 1. Log in to the vCenter Server at _https://<management_vcenter_server_fqdn>/ui_ as `administrator@vsphere.local`.
 2. Select **Menu** > **Administration**.
 3. In the left pane, select **Access control** > **Global permissions** and click the **Add permissions** icon.
-4. In the **Add permissions** dialog box, enter the service account (_e.g._ svc-packer-vsphere@example.com), select the custom role (_e.g._ Packer to vSphere Integration Role) and the **Propagate to children** check box, and click OK.
+4. In the **Add permissions** dialog box, enter the service account (_e.g._
+   `svc-packer-vsphere@example.com`), select the custom role (_e.g._ Packer to vSphere Integration
+   Role) and the **Propagate to children** check box, and click **OK**.
 
-In an environment with many vCenter Server instances, such as management and workload, in enhanced linked-mode, you may wish to further reduce the scope of access across the vSphere infrastructure. For example, if you do not want Packer to have access to the management vCenter Server instance, but only allow access to workload vCenter Server instances:
+In an environment with many vCenter Server instances, such as management and workload, in enhanced
+linked-mode, you may wish to further reduce the scope of access across the vSphere infrastructure if
+you do not want Packer to have access to the management vCenter Server instance, but only allow
+access to workload vCenter Server instances.
 
-1. From the **Hosts and clusters** inventory, select management vCenter Server to restrict scope, and click the **Permissions** tab.
+For example:
+
+1. From the **Hosts and clusters** inventory, select management vCenter Server to restrict scope,
+   and click the **Permissions** tab.
 2. Select the service account with the custom role assigned and click the **Change role** icon.
-3. In the **Change role** dialog box, from the **Role** drop-down menu, select **No Access**, select the **Propagate to children** check box, and click **OK**.
+3. In the **Change role** dialog box, from the **Role** drop-down menu, select **No Access**, select
+   the **Propagate to children** check box, and click **OK**.

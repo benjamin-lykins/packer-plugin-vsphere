@@ -16,43 +16,58 @@ import (
 )
 
 type HardwareConfig struct {
-	// Number of CPU cores.
+	// Specifies the number of virtual CPUs cores for the virtual machine.
 	CPUs int32 `mapstructure:"CPUs"`
-	// Number of CPU cores per socket.
+	// Specifies the number of virtual CPU cores per socket for the virtual machine.
 	CpuCores int32 `mapstructure:"cpu_cores"`
-	// Amount of reserved CPU resources in MHz.
+	// Specifies the CPU reservation in MHz.
 	CPUReservation int64 `mapstructure:"CPU_reservation"`
-	// Upper limit of available CPU resources in MHz.
+	// Specifies the upper limit of available CPU resources in MHz.
 	CPULimit int64 `mapstructure:"CPU_limit"`
-	// Enable CPU hot plug setting for virtual machine. Defaults to `false`.
+	// Specifies to enable CPU hot plug setting for virtual machine. Defaults to `false`
 	CpuHotAddEnabled bool `mapstructure:"CPU_hot_plug"`
-	// Amount of RAM in MB.
+	// Specifies the amount of memory for the virtual machine in MB.
 	RAM int64 `mapstructure:"RAM"`
-	// Amount of reserved RAM in MB.
+	// Specifies the amount of reserved memory in MB.
 	RAMReservation int64 `mapstructure:"RAM_reservation"`
-	// Reserve all available RAM. Defaults to `false`. Cannot be used together
-	// with `RAM_reservation`.
+	// Specifies to reserve all allocated memory. Defaults to `false`.
+	//
+	// -> **Note:** May not be used together with `RAM_reservation`.
 	RAMReserveAll bool `mapstructure:"RAM_reserve_all"`
-	// Enable RAM hot plug setting for virtual machine. Defaults to `false`.
+	// Specified to enable memory hot add setting for virtual machine. Defaults to `false`.
 	MemoryHotAddEnabled bool `mapstructure:"RAM_hot_plug"`
-	// Amount of video memory in KB. See [vSphere documentation](https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-789C3913-1053-4850-A0F0-E29C3D32B6DA.html)
-	// for supported maximums. Defaults to 4096 KB.
+	// Specifies the amount of video memory in KB. Defaults to 4096 KB.
+	//
+	// -> **Note:** Refer to the [vSphere documentation](https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-789C3913-1053-4850-A0F0-E29C3D32B6DA.html)
+	// for supported maximums.
 	VideoRAM int64 `mapstructure:"video_ram"`
-	// Number of video displays. See [vSphere documentation](https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-789C3913-1053-4850-A0F0-E29C3D32B6DA.html)
-	// for supported maximums. Defaults to 1.
+	// Specifies the number of video displays. Defaults to `1`.
+	//
+	//`-> **Note:** Refer to the [vSphere documentation](https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-789C3913-1053-4850-A0F0-E29C3D32B6DA.html)
+	// for supported maximums.
 	Displays int32 `mapstructure:"displays"`
-	// vGPU profile for accelerated graphics. See [NVIDIA GRID vGPU documentation](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#configure-vmware-vsphere-vm-with-vgpu)
-	// for examples of profile names. Defaults to none.
+	// Specifies the vGPU profile for accelerated graphics. Defaults to `none`.
+	//
+	// -> **Note:** Refer to the [NVIDIA GRID vGPU documentation](https://docs.nvidia.com/grid/latest/grid-vgpu-user-guide/index.html#configure-vmware-vsphere-vm-with-vgpu)
+	// for examples of profile names.
 	VGPUProfile string `mapstructure:"vgpu_profile"`
-	// Enable nested hardware virtualization for VM. Defaults to `false`.
+	// Specified to enable nested hardware virtualization for the virtual machine. Defaults to
+	// `false`.
 	NestedHV bool `mapstructure:"NestedHV"`
-	// Set the Firmware for virtual machine. Supported values: `bios`, `efi` or `efi-secure`. Defaults to `bios`.
+	// Specifies the firmware for the virtual machine.
+	//
+	// The available options for this setting are: 'bios', 'efi', and 'efi-secure'.
+	//
+	// -> **Note:** Use `efi-secure` for UEFI Secure Boot.
 	Firmware string `mapstructure:"firmware"`
-	// During the boot, force entry into the BIOS setup screen. Defaults to `false`.
+	// Specifies to force entry into the BIOS setup screen during boot. Defaults to `false`.
 	ForceBIOSSetup bool `mapstructure:"force_bios_setup"`
-	// Add virtual TPM device for virtual machine. Defaults to `false`.
+	// Specifies to enable virtual trusted platform module (TPM) device for the virtual machine.
+	// Defaults to `false`.
 	VTPMEnabled bool `mapstructure:"vTPM"`
-	// Add a precision clock device for virtual machine. Defaults to `none`.
+	// Specifies the virtual precision clock device for the virtual machine. Defaults to `none`.
+	//
+	// The available options for this setting are: `none`, `ntp`, and `ptp`.
 	VirtualPrecisionClock string `mapstructure:"precision_clock"`
 }
 

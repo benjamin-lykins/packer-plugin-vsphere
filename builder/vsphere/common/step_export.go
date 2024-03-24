@@ -32,25 +32,9 @@ import (
 
 // You can export an image in Open Virtualization Format (OVF) to the Packer host.
 //
-// Example usage:
+// HCL Example:
 //
-// In JSON:
-// ```json
-// ...
-//
-//	"vm_name": "example-ubuntu",
-//
-// ...
-//
-//	"export": {
-//	  "force": true,
-//	  "output_directory": "./output-artifacts"
-//	},
-//
-// ```
-// In HCL2:
 // ```hcl
-//
 //	# ...
 //	vm_name = "example-ubuntu"
 //	# ...
@@ -58,8 +42,20 @@ import (
 //	  force = true
 //	  output_directory = "./output-artifacts"
 //	}
-//
 // ```
+//
+// JSON Example:
+//
+// ```json
+// ...
+//	"vm_name": "example-ubuntu",
+// ...
+//	"export": {
+//	  "force": true,
+//	  "output_directory": "./output-artifacts"
+//	},
+// ```
+//
 // The above configuration would create the following files:
 //
 // ```text
@@ -68,41 +64,53 @@ import (
 // ./output-artifacts/example-ubuntu.ovf
 // ```
 type ExportConfig struct {
-	// Name of the exported image in Open Virtualization Format (OVF).
-	// The name of the virtual machine with the `.ovf` extension is used if this option is not specified.
+	// Specifies the name of the exported image in Open Virtualization Format (OVF).
+	//
+	// -> **Note:** The name of the virtual machine with the `.ovf` extension is used if this
+	// option is not specified.
 	Name string `mapstructure:"name"`
-	// Forces the export to overwrite existing files. Defaults to false.
-	// If set to false, the export will fail if the files already exists.
+	// Specifies to force the export and overwrite existing files. Defaults to `false`.
+	//
+	// -> **Note:** If set to `false`, the export will fail if the files already exist.
 	Force bool `mapstructure:"force"`
-	// Include additional image files that are that are associated with the virtual machine. Defaults to false.
-	// For example, `.nvram` and `.log` files.
+	// Specifies to include additional image files that are that are associated with the virtual
+	// machine. For example, `.nvram` and `.log` files. Defaults to `false`.
 	ImageFiles bool `mapstructure:"image_files"`
-	// Generate a manifest file with the specified hash algorithm. Defaults to `sha256`.
-	// Available options include `none`, `sha1`, `sha256`, and `sha512`. Use `none` for no manifest.
+	// Specifies the hash algorithm to use when generating a manifest file. Defaults to `sha256`.
+	//
+	// The available options for this setting are: 'none', 'sha1', 'sha256', and 'sha512'.
+	//
+	// --> **Tip:** Use `none` to disable the creation of a manifest file.
 	Manifest string `mapstructure:"manifest"`
-	// Path to the directory where the exported image will be saved.
+	// Specifies the path to the directory where the exported image will be saved.
 	OutputDir OutputConfig `mapstructure:",squash"`
-	// Advanced image export options. Options can include:
-	// * mac - MAC address is exported for each Ethernet device.
-	// * uuid - UUID is exported for the virtual machine.
-	// * extraconfig - Extra configuration options are exported for the virtual machine.
-	// * nodevicesubtypes - Resource subtypes for CD/DVD drives, floppy drives, and serial and parallel ports are not exported.
+	// Specifies advanced image export configuration options, which include:
 	//
-	// For example, adding the following export config option outputs the MAC addresses for each Ethernet device in the OVF descriptor:
+	// * `mac` - MAC address is exported for each Ethernet device.
+	// * `uuid` - UUID is exported for the virtual machine.
+	// * `extraconfig` - Extra configuration options are exported for the virtual machine.
+	// * `nodevicesubtypes` - Resource subtypes for CD/DVD drives, floppy drives, and serial and
+	//   parallel ports are not exported.
 	//
-	// In JSON:
-	// ```json
-	// ...
-	//   "export": {
-	//     "options": ["mac"]
-	//   },
-	// ```
-	// In HCL2:
+	// For example, adding the following export configuration option outputs the MAC addresses for
+	// each Ethernet device in the OVF descriptor:
+	//
+	// HCL Example:
+	//
 	// ```hcl
 	// ...
 	//   export {
 	//     options = ["mac"]
 	//   }
+	// ```
+	//
+	// JSON: Example:
+	//
+	// ```json
+	// ...
+	//   "export": {
+	//     "options": ["mac"]
+	//   },
 	// ```
 	Options []string `mapstructure:"options"`
 }

@@ -47,15 +47,20 @@ type Config struct {
 	SnapshotName string `mapstructure:"snapshot_name"`
 	// Specifies to convert the cloned virtual machine to a template after the build is complete.
 	// Defaults to `false`.
-	// If set to `true`, the virtual machine can not be imported to a content library.
+	//
+	// -> **Note:** If set to `true`, the virtual machine can not be imported to a content library.
 	ConvertToTemplate bool `mapstructure:"convert_to_template"`
-	// Specifies the configuration for exporting the virtual machine to an OVF.
-	// The virtual machine is not exported if [export configuration](#export-configuration) is not specified.
-	Export *common.ExportConfig `mapstructure:"export"`
 	// Specifies the configuration for importing a VM template or OVF template to a content library.
-	// The template will not be imported if no [content library import configuration](#content-library-import-configuration) is specified.
-	// If set, `convert_to_template` must be set to `false`.
+	// The template will not be imported if no [content library import configuration](#content-library-import-configuration)
+	// is specified.
+	//
+	// -> **Note:** If set, `convert_to_template` must be set to `false`.
 	ContentLibraryDestinationConfig *common.ContentLibraryDestinationConfig `mapstructure:"content_library_destination"`
+	// Specifies the configuration for exporting the virtual machine to an OVF.
+	//
+	// -> **Note:** The virtual machine is not exported if the [export configuration](#export-configuration)
+	// is not specified.
+	Export *common.ExportConfig `mapstructure:"export"`
 
 	ctx interpolate.Context
 }

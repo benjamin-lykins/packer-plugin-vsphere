@@ -30,6 +30,31 @@ type vAppConfig struct {
 	//
 	// You cannot set values for vApp properties on virtual machines created from scratch,
 	// on virtual machines that lack a vApp configuration, or on property keys that do not exist.
+	//
+	// HCL Example:
+	// ```hcl
+	//   vapp {
+	//     properties = {
+	//       hostname  = var.hostname
+	//       user-data = base64encode(var.user_data)
+	//     }
+	//   }
+	// ```
+	//
+	// JSON Example:
+	//
+	// ```json
+	//   "vapp": {
+	//       "properties": {
+	//           "hostname": "{{ user `hostname`}}",
+	//           "user-data": "{{ env `USERDATA`}}"
+	//       }
+	//   }
+	// ```
+	//
+	// A `user-data` field requires the content of a YAML file to be encoded with base64.
+	// This can be done using an environment variable:
+	//`export USERDATA=$(gzip -c9 <userdata.yaml | { base64 -w0 2>/dev/null || base64; })`
 	Properties map[string]string `mapstructure:"properties"`
 }
 
@@ -40,10 +65,10 @@ type CloneConfig struct {
 	// Cannot be used with `linked_clone`.
 	DiskSize int64 `mapstructure:"disk_size"`
 	// Specifies that the virtual machine is created as a linked clone from the latest snapshot. Defaults to `false`.
-	// Cannot be used with `disk_size`.`
+	// Cannot be used with `disk_size`.
 	LinkedClone bool `mapstructure:"linked_clone"`
 	// Specifies the network to which the virtual machine will connect. If no network is specified,
-	// provide 'host' to allow Packer to search for an available network. For networks placed
+	// provide `host` to allow Packer to search for an available network. For networks placed
 	// within a network folder vCenter Server, provider the object path to the network.
 	// For example, `network = "/<DatacenterName>/<FolderName>/<NetworkName>"`.
 	Network string `mapstructure:"network"`

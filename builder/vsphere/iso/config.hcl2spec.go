@@ -147,8 +147,8 @@ type FlatConfig struct {
 	CreateSnapshot                  *bool                                       `mapstructure:"create_snapshot" cty:"create_snapshot" hcl:"create_snapshot"`
 	SnapshotName                    *string                                     `mapstructure:"snapshot_name" cty:"snapshot_name" hcl:"snapshot_name"`
 	ConvertToTemplate               *bool                                       `mapstructure:"convert_to_template" cty:"convert_to_template" hcl:"convert_to_template"`
-	Export                          *common.FlatExportConfig                    `mapstructure:"export" cty:"export" hcl:"export"`
 	ContentLibraryDestinationConfig *common.FlatContentLibraryDestinationConfig `mapstructure:"content_library_destination" cty:"content_library_destination" hcl:"content_library_destination"`
+	Export                          *common.FlatExportConfig                    `mapstructure:"export" cty:"export" hcl:"export"`
 }
 
 // FlatMapstructure returns a new FlatConfig.
@@ -299,8 +299,8 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"create_snapshot":                &hcldec.AttrSpec{Name: "create_snapshot", Type: cty.Bool, Required: false},
 		"snapshot_name":                  &hcldec.AttrSpec{Name: "snapshot_name", Type: cty.String, Required: false},
 		"convert_to_template":            &hcldec.AttrSpec{Name: "convert_to_template", Type: cty.Bool, Required: false},
-		"export":                         &hcldec.BlockSpec{TypeName: "export", Nested: hcldec.ObjectSpec((*common.FlatExportConfig)(nil).HCL2Spec())},
 		"content_library_destination":    &hcldec.BlockSpec{TypeName: "content_library_destination", Nested: hcldec.ObjectSpec((*common.FlatContentLibraryDestinationConfig)(nil).HCL2Spec())},
+		"export":                         &hcldec.BlockSpec{TypeName: "export", Nested: hcldec.ObjectSpec((*common.FlatExportConfig)(nil).HCL2Spec())},
 	}
 	return s
 }

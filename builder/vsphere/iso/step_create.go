@@ -22,11 +22,24 @@ import (
 // Defines a Network Adapter
 // If no adapter is defined, network tasks (communicators, most provisioners) won't work, so it's advised to define one.
 //
-// Example that creates two network adapters:
+// Example configuration with two network adapters:
 //
-// In JSON:
+// HCL Example:
+//
+// ```hcl
+//	network_adapters {
+//	    network = "VM Network"
+//	    network_card = "vmxnet3"
+//	}
+//	network_adapters {
+//	    network = "OtherNetwork"
+//	    network_card = "vmxnet3"
+//	}
+// ```
+//
+// JSON Example:
+//
 // ```json
-//
 //	"network_adapters": [
 //	  {
 //	    "network": "VM Network",
@@ -37,24 +50,10 @@ import (
 //	    "network_card": "vmxnet3"
 //	  }
 //	],
-//
-// ```
-// In HCL2:
-// ```hcl
-//
-//	network_adapters {
-//	    network = "VM Network"
-//	    network_card = "vmxnet3"
-//	}
-//	network_adapters {
-//	    network = "OtherNetwork"
-//	    network_card = "vmxnet3"
-//	}
-//
 // ```
 type NIC struct {
 	// Specifies the network to which the virtual machine will connect. If no network is specified,
-	// provide 'host' to allow Packer to search for an available network. For networks placed
+	// provide `host` to allow Packer to search for an available network. For networks placed
 	// within a network folder vCenter Server, provider the object path to the network.
 	// For example, `network = "/<DatacenterName>/<FolderName>/<NetworkName>"`.
 	Network string `mapstructure:"network"`
@@ -69,18 +68,19 @@ type NIC struct {
 type CreateConfig struct {
 	// Specifies the virtual machine hardware version. Defaults to the most current virtual machine
 	// hardware version supported by the ESXi host.
-	// Refer to [VMware KB article 1003746](https://kb.vmware.com/s/article/1003746) for the list
-	// of supported virtual machine hardware versions.
+	//
+	// -> **Note:** Refer to [VMware KB article 1003746](https://kb.vmware.com/s/article/1003746)
+	// for the a of supported virtual machine hardware versions.
 	Version uint `mapstructure:"vm_version"`
-	// Specifies the guest operating system identifier for the virtual machine.
-	// If not specified, the setting defaults to `otherGuest`.
+	// Specifies the guest operating system identifier for the virtual machine. Defaults to
+	// `otherGuest`.
 	//
 	// To get a list of supported guest operating system identifiers for your ESXi host,
 	// run the following PowerShell command using `VMware.PowerCLI`:
 	//
 	// ```powershell
-	// Connect-VIServer -Server "vc.example.com" -User "administrator@vsphere" -Password "password"
-	// $esxiHost = Get-VMHost -Name "esxi.example.com"
+	// Connect-VIServer -Server "vcenter.example.com" -User "administrator@vsphere" -Password "password"
+	// $esxiHost = Get-VMHost -Name "esxi-01.example.com"
 	// $environmentBrowser = Get-View -Id $esxiHost.ExtensionData.Parent.ExtensionData.ConfigManager.EnvironmentBrowser
 	// $vmxVersion = ($environmentBrowser.QueryConfigOptionDescriptor() | Where-Object DefaultConfigOption).Key
 	// $osDescriptor = $environmentBrowser.QueryConfigOption($vmxVersion, $null).GuestOSDescriptor
@@ -89,15 +89,22 @@ type CreateConfig struct {
 	GuestOSType   string               `mapstructure:"guest_os_type"`
 	StorageConfig common.StorageConfig `mapstructure:",squash"`
 	// Specifies the network adapters for the virtual machine.
-	// If no network adapter is defined, all network-related operations will be skipped.
+	//
+	// -> **Note:** If no network adapter is defined, all network-related operations are skipped.
 	NICs []NIC `mapstructure:"network_adapters"`
-	// Specifies the USB controllers for the virtual machine. Use `usb` for a USB 2.0 controller and
-	// `xhci`` for a USB 3.0 controller.
-	// -> **Note:** Maximum of one controller of each type.
+	// Specifies the USB controllers for the virtual machine.
+	//
+	// The available options for this setting are: `usb` and `xhci`.
+	//
+	// - `usb`: USB 2.0
+	// - `xhci`: USB 3.0
+	//
+	// -> **Note:** A maximum of one of each controller type can be defined.
 	USBController []string `mapstructure:"usb_controller"`
 	// Specifies the annotations for the virtual machine.
 	Notes string `mapstructure:"notes"`
 	// Specifies whether to destroy the virtual machine after the build is complete.
+	// Defaults to `false`.
 	Destroy bool `mapstructure:"destroy"`
 }
 

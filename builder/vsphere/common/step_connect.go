@@ -17,15 +17,21 @@ import (
 )
 
 type ConnectConfig struct {
-	// vCenter Server hostname.
+	// Specifies the fully qualified domain name or IP address of the vCenter Server instance.
 	VCenterServer string `mapstructure:"vcenter_server"`
-	// vSphere username.
+	// Specifies the username to authenticate with the vCenter Server instance.
 	Username string `mapstructure:"username"`
-	// vSphere password.
+	// Specifies the password to authenticate with the vCenter Server instance.
 	Password string `mapstructure:"password"`
-	// Do not validate the vCenter Server TLS certificate. Defaults to `false`.
+	// Specifies not to validate the certificate of the vCenter Server instance.
+	// Defaults to `false`.
+	//
+	// -> **Note:** This option is beneficial in scenarios where the certificate is self-signed
+	// or does not meet standard validation criteria.
 	InsecureConnection bool `mapstructure:"insecure_connection"`
-	// vSphere datacenter name. Required if there is more than one datacenter in the vSphere inventory.
+	// Specifies the name of the datacenter object in the vSphere inventory.
+	//
+	// -> **Note:** Required if more than one datacenter object exists in the vSphere inventory.
 	Datacenter string `mapstructure:"datacenter"`
 }
 
