@@ -50,6 +50,9 @@ necessary for this build to succeed and can be found further down the page.
   The template will not be imported if no [content library import configuration](#content-library-import-configuration) is specified.
   If set, `convert_to_template` must be set to `false`.
 
+- `remote_cache_cleanup` (bool) - Specifies to cleanup the `packer_cache` directory after the build is complete.
+  Defaults to `false`.
+
 <!-- End of code generated from the comments of the Config struct in builder/vsphere/iso/config.go; -->
 
 

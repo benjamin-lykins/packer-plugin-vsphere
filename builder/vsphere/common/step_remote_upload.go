@@ -18,6 +18,7 @@ type StepRemoteUpload struct {
 	Datastore                  string
 	Host                       string
 	SetHostForDatastoreUploads bool
+	RemoteCacheCleanup         bool
 	UploadedCustomCD           bool
 }
 
@@ -45,35 +46,39 @@ func (s *StepRemoteUpload) Run(_ context.Context, state multistep.StateBag) mult
 		state.Put("cd_path", fullRemotePath)
 	}
 
+	if s.RemoteCacheCleanup {
+		state.Put("remote_cache_cleanup", s.RemoteCacheCleanup)
+	}
+
 	return multistep.ActionContinue
 }
 
 func GetRemoteDirectoryAndPath(path string, ds driver.Datastore) (string, string, string, string) {
 	filename := filepath.Base(path)
 	remotePath := fmt.Sprintf("packer_cache/%s", filename)
-	remoteDirectory := fmt.Sprintf("[%s] packer_cache/", ds.Name())
+	remoteDirectory := fmt.Sprintf("[%s] packer_cache", ds.Name())
 	fullRemotePath := fmt.Sprintf("%s/%s", remoteDirectory, filename)
 
 	return filename, remotePath, remoteDirectory, fullRemotePath
-
 }
+
 func (s *StepRemoteUpload) uploadFile(path string, d driver.Driver, ui packersdk.Ui) (string, error) {
 	ds, err := d.FindDatastore(s.Datastore, s.Host)
 	if err != nil {
-		return "", fmt.Errorf("datastore doesn't exist: %v", err)
+		return "", fmt.Errorf("error finding the datastore: %v", err)
 	}
 
 	filename, remotePath, remoteDirectory, fullRemotePath := GetRemoteDirectoryAndPath(path, ds)
 
 	if exists := ds.FileExists(remotePath); exists == true {
-		ui.Say(fmt.Sprintf("File %s already exists; skipping upload.", fullRemotePath))
+		ui.Say(fmt.Sprintf("File %s already exists; skipping upload...", fullRemotePath))
 		return fullRemotePath, nil
 	}
 
-	ui.Say(fmt.Sprintf("Uploading %s to %s", filename, remotePath))
+	ui.Say(fmt.Sprintf("Uploading %s to %s...", filename, remoteDirectory))
 
 	if exists := ds.DirExists(remotePath); exists == false {
-		log.Printf("Remote directory doesn't exist; creating...")
+		log.Printf("Cache directory does not exist; creating %s...", remoteDirectory)
 		if err := ds.MakeDirectory(remoteDirectory); err != nil {
 			return "", err
 		}
@@ -88,7 +93,9 @@ func (s *StepRemoteUpload) uploadFile(path string, d driver.Driver, ui packersdk
 func (s *StepRemoteUpload) Cleanup(state multistep.StateBag) {
 	_, cancelled := state.GetOk(multistep.StateCancelled)
 	_, halted := state.GetOk(multistep.StateHalted)
-	if !cancelled && !halted {
+	_, remoteCacheCleanup := state.GetOk("remote_cache_cleanup")
+
+	if !cancelled && !halted && !remoteCacheCleanup {
 		return
 	}
 
@@ -103,17 +110,17 @@ func (s *StepRemoteUpload) Cleanup(state multistep.StateBag) {
 
 	ui := state.Get("ui").(packersdk.Ui)
 	d := state.Get("driver").(*driver.VCenterDriver)
-	ui.Say("Deleting cd_files image from remote datastore ...")
+	ui.Say(fmt.Sprintf("Removing %s...", UploadedCDPath))
 
 	ds, err := d.FindDatastore(s.Datastore, s.Host)
 	if err != nil {
-		log.Printf("Error finding datastore to delete custom CD; please delete manually: %s", err)
+		log.Printf("Error finding the cache datastore. Please remove the item manually: %s", err)
 		return
 	}
 
 	err = ds.Delete(UploadedCDPath.(string))
 	if err != nil {
-		log.Printf("Error deleting custom CD from remote datastore; please delete manually: %s", err)
+		log.Printf("Error removing item from the cache. Please remove the item manually: %s", err)
 		return
 
 	}

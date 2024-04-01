@@ -56,6 +56,9 @@ type Config struct {
 	// The template will not be imported if no [content library import configuration](#content-library-import-configuration) is specified.
 	// If set, `convert_to_template` must be set to `false`.
 	ContentLibraryDestinationConfig *common.ContentLibraryDestinationConfig `mapstructure:"content_library_destination"`
+	// Specifies to cleanup the `packer_cache` directory after the build is complete.
+	// Defaults to `false`.
+	RemoteCacheCleanup bool `mapstructure:"remote_cache_cleanup"`
 
 	ctx interpolate.Context
 }

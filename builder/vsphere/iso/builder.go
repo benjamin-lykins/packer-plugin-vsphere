@@ -66,6 +66,7 @@ func (b *Builder) Run(ctx context.Context, ui packersdk.Ui, hook packersdk.Hook)
 			Datastore:                  b.config.Datastore,
 			Host:                       b.config.Host,
 			SetHostForDatastoreUploads: b.config.SetHostForDatastoreUploads,
+			RemoteCacheCleanup:         b.config.RemoteCacheCleanup,
 		},
 		&StepCreateVM{
 			Config:   &b.config.CreateConfig,
